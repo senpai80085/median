@@ -1,3 +1,3 @@
-# Welcome to your Lovable project
+# Median - AI Media Guardian
 
-TODO: Document your project here
+Detect unauthorized usage of images using AI services.
