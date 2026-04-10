@@ -34,7 +34,7 @@ export default function ScanPage() {
     },
   });
 
-  const readyMedia = media?.filter((m) => m.has_embedding) ?? [];
+  const readyMedia = media ?? [];
   const config = result ? statusConfig[result.status] : null;
   const StatusIcon = config?.icon;
 
@@ -66,7 +66,7 @@ export default function ScanPage() {
                 ))}
                 {readyMedia.length === 0 && !mediaLoading && (
                   <SelectItem value="_none" disabled>
-                    No media with embeddings available
+                    No media available to scan
                   </SelectItem>
                 )}
               </SelectContent>
