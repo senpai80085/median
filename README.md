@@ -1,67 +1,92 @@
-# Median - AI Media Guardian
-
-Median is a localized, dual-architecture (Client-Server) application built to detect unauthorized usage of image assets using perceptive hashing algorithms. It empowers creators to protect their Intellectual Property without relying on expensive, privacy-compromising external vision APIs.
-
----
-
-## 🏗️ Architecture & Tech Stack
-
-Median uses an entirely localized pipeline ensuring zero image data is sent to external cloud APIs for processing.
-
-### Frontend
-- **React 18 & Vite**: Lightning fast component-based architecture and HMR.
-- **TypeScript**: End-to-end static typing for safe, predictable UI iteration.
-- **Tailwind CSS & Shadcn UI**: Utility-first atomic styling layered with accessible Radix primitives.
-- **TanStack React Query**: Advanced client-side state caching, enabling smooth asynchronous polling and loading states against backend media endpoints.
-- **React Router DOM**: Client-side routing mapped across three primary pages (`Index`, `Upload`, `Scan`).
-
-### Backend
-- **Python 3+ & FastAPI**: Asynchronous API architecture capable of processing incoming multipart uploads and running complex local sweeps concurrently.
-- **SQLite3**: A built-in, lightweight persistence layer safely saving file mapping paths and hashes internally.
-- **ImageHash & Pillow**: The core local AI component. Pillow interprets raw image byte streams, while ImageHash generates **Perceptual Hashes (pHash)** mapped directly to image pixel frequency characteristics rather than cryptographic parity.
-- **pytest**: Foundational unit and router integration testing securely sandboxed using monkeypatch fixtures and temporary local file allocation models.
+<div align="center">
+  <h1>🛡️ Median: AI Media Guardian</h1>
+  <p><strong>A hybrid AI-powered system designed to protect intellectual property and detect unauthorized media clones.</strong></p>
+</div>
 
 ---
 
-## ⚙️ How It Works (The "AI" Engine)
+## 🏆 What is Median?
 
-Median's "AI" doesn't use external LLMs. Instead, it measures Perceptual Hashes (`pHash`):
-1. **Hashing Phase (`POST /upload`)**: When an image uploads, the backend algorithm calculates its visual frequencies, creating a static 64-bit string identifier. This hash is logged into SQLite.
-2. **Scan Phase (`POST /scan`)**: When scanning a targeted image to find potential infringements, the system compares the target's `pHash` against every other stored `pHash`.
-3. **Similarity Equation**: The engine calculates the **Hamming Distance** between two hex strings (how many bits inherently differ). The score returns dynamically: `Similarity = 100 - (Hamming_Distance * 5)`. 
-   - A perfectly identical (or minorly cropped/recolored) image yields a high similarity `(> 80%)`, automatically flagging it as **Unauthorized**.
-   - Entirely distinct images fall securely to 0%, marked **Safe**.
+Median is an enterprise-grade media similarity engine designed to stop copyright infringement, deepfakes, and unauthorized asset usage.
+
+Instead of relying on basic metadata, **Median uses a multi-layered AI pipeline to "look" at an image and understand its structure and meaning.**
+
+### 🧠 The Hybrid AI Architecture
+Median solves the massive computational cost of similarity searches by blending traditional perceptual hashing with modern Deep Learning:
+
+1. **Velocity Layer (pHash):** Evaluates exact perceptual similarity of an image in `O(N)` time. This acts as an ultra-fast pre-filter, dropping the search space down to the top 5 candidates.
+2. **Semantic Layer (Vertex AI Multimodal Embeddings):** Generates a 1408-dimensional vector representing the core "meaning" and visual style of the image. A cosine distance calculation is performed against the top candidates.
+3. **Reasoning Layer (Gemini 2.0 Flash):** Evaluates the blended scores and securely generates a human-readable explanation of *why* an image is flagged as "Unauthorized" or "Safe".
+
+## 🚀 Key Features for Judges
+
+* **Graceful Degradation:** Built for production. If Google AI APIs timeout or fail, the system instantly falls back to pHash-only matching, ensuring zero downtime.
+* **Deterministic Output:** Uses prompt-engineering and temperature controls on Gemini to prevent AI hallucinations, ensuring the "explanations" are strictly grounded in mathematical confidence scores.
+* **Scalable Pipeline:** Uses top-K approximate filtering before running heavy vector math.
+* **Oversized Payload Guards:** Built-in network middleware rejecting files >10MB at the border line to protect backend memory.
 
 ---
 
-## 🚀 Getting Started
+## 💻 Tech Stack
 
-### 1. Starting the Backend
-Ensure you have Python installed.
+* **Frontend:** React, Vite, Tailwind CSS, TypeScript
+* **Backend:** Python, FastAPI, SQLite (Local Data Storage)
+* **AI & Cloud Services:** 
+   * **Google Cloud Vertex AI:** `multimodalembedding@001`
+   * **Google Generative AI:** `gemini-2.0-flash`
+   * **pHash (ImageHash):** Structural filtering
+
+---
+
+## 🛠️ How to Run Locally
+
+### 1. Backend Setup (FastAPI & Google AI)
+Ensure you have Python 3.10+ installed. You will need a Google Cloud Project with the **Vertex AI API** enabled.
+
 ```bash
-pip install -r backend/requirements.txt
+# Navigate to backend
+cd backend
+
+# Create virtual environment and install dependencies
+python -m venv venv
+source venv/bin/activate  # (On Windows: venv\Scripts\activate)
+pip install -r requirements.txt
 ```
-Run the FastAPI Uvicorn Server:
-```bash
-python -m uvicorn backend.main:app --reload
-```
-The server will boot up at `http://localhost:8000`.
 
-### 2. Starting the Frontend
-Ensure you have Node.js / Bun installed.
+> **🔑 Authentication Details:**
+> Create a `.env` file in the `backend/` directory:
+> ```env
+> GOOGLE_APPLICATION_CREDENTIALS=../key.json
+> GOOGLE_CLOUD_PROJECT=your-project-id
+> GEMINI_MODEL=gemini-2.0-flash
+> MAX_UPLOAD_SIZE=10485760
+> ```
+> *(Ensure your GCP `key.json` is sitting in the root folder!)*
+
+Run the backend server:
 ```bash
+python main.py
+```
+*The backend will boot up at `http://localhost:8000` with full Swagger docs available at `/docs`.*
+
+### 2. Frontend Setup (React / Vite)
+Open a new terminal.
+
+```bash
+# Install dependencies
 npm install
+
+# Start development server
 npm run dev
 ```
-The client will boot up at `http://localhost:5173`. 
+*The frontend will be available at `http://localhost:8080` (or the port defined by Vite).*
 
 ---
 
-## 🧪 Testing
-The system employs `pytest` to comprehensively map mathematical bounds and assure local file system routing remains unpolluted:
-```bash
-python -m pytest backend/tests/ -v
-```
+## 🤔 How it Works (A User Journey)
 
-## 📋 Roadmap State
-This repository successfully executed **Phase 2**, fully integrating structural backend testing coverage. Future integrations will transition the O(N) database sweep toward highly scalable Vector indices like FAISS or PGVector.
+1. A creator uploads an original artwork (e.g., *a drawing of a sci-fi city*). 
+2. Median processes it in milliseconds, extracting the pHash and Vertex AI Embedding, and indexing it into the database.
+3. A bad actor crops, slightly recolors, or alters the same artwork and attempts to upload it.
+4. Median scans the file. The pHash triggers a structural warning, while Vertex AI flags a 99% semantic match.
+5. Gemini Flash compiles this data and throws an **Unauthorized** alert with a detailed summary. The bad actor is blocked.

@@ -6,3 +6,7 @@ ImageHash
 pytest
 pytest-asyncio
 httpx
+google-cloud-aiplatform
+google-generativeai
+python-dotenv
+numpy

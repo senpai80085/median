@@ -22,3 +22,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Hackathon/Meta Exclusions
+.planning/
+.lovable/
+__pycache__/
+*.sqlite3
+*.db
+
+# Secrets — NEVER commit these
+key.json
+*.env
+backend/.env
