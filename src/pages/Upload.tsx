@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { uploadMedia, type UploadResponse } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 export default function UploadPage() {
   const [dragActive, setDragActive] = useState(false);
   const [result, setResult] = useState<UploadResponse | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -63,9 +64,9 @@ export default function UploadPage() {
       {/* Hidden File Input */}
       <input 
         type="file" 
-        id="fileInput" 
-        className="hidden" 
-        accept="image/*,.png,.jpg,.jpeg,.gif,.webp,.bmp" 
+        ref={fileInputRef}
+        style={{ display: "none" }}
+        accept="image/png, image/jpeg, image/jpg, image/webp, image/gif, image/bmp" 
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file) handleFile(file);
@@ -81,9 +82,7 @@ export default function UploadPage() {
         onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
         onDragLeave={() => setDragActive(false)}
         onDrop={onDrop}
-        onClick={() => {
-          document.getElementById('fileInput')?.click();
-        }}
+        onClick={() => fileInputRef.current?.click()}
       >
         <CardContent className="flex flex-col items-center justify-center py-16 text-center">
           {mutation.isPending ? (
