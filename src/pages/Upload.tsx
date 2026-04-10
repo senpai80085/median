@@ -60,6 +60,19 @@ export default function UploadPage() {
         </p>
       </div>
 
+      {/* Hidden File Input */}
+      <input 
+        type="file" 
+        id="fileInput" 
+        className="hidden" 
+        accept="image/*,.png,.jpg,.jpeg,.gif,.webp,.bmp" 
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFile(file);
+          e.target.value = ''; // Reset for sequential uploads of same file
+        }} 
+      />
+
       {/* Drop zone */}
       <Card
         className={`border-2 border-dashed transition-colors cursor-pointer ${
@@ -69,14 +82,7 @@ export default function UploadPage() {
         onDragLeave={() => setDragActive(false)}
         onDrop={onDrop}
         onClick={() => {
-          const input = document.createElement("input");
-          input.type = "file";
-          input.accept = "image/*";
-          input.onchange = (e) => {
-            const file = (e.target as HTMLInputElement).files?.[0];
-            if (file) handleFile(file);
-          };
-          input.click();
+          document.getElementById('fileInput')?.click();
         }}
       >
         <CardContent className="flex flex-col items-center justify-center py-16 text-center">
