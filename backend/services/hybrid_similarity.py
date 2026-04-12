@@ -27,10 +27,10 @@ from backend.database.db import get_db
 logger = logging.getLogger(__name__)
 
 # ── Tuning knobs ─────────────────────────────────────────────
-PHASH_WEIGHT = 0.4
-EMBEDDING_WEIGHT = 0.6
-TOP_K = 5
-UNAUTHORIZED_THRESHOLD = 0.8   # > 0.8 → "Unauthorized"
+PHASH_WEIGHT = 0.3          # Reduced — pHash is less reliable for cropped images
+EMBEDDING_WEIGHT = 0.7      # Increased — semantic signal is crop-tolerant
+TOP_K_PHASH = 15            # Top candidates by pHash structure
+EMBEDDING_FALLBACK_CAP = 20 # Always compare embeddings for up to this many candidates
 
 
 # ── Data structures ──────────────────────────────────────────
@@ -41,7 +41,8 @@ class ScanMatch:
     final_score: float              # 0.0 – 1.0
     phash_score: float
     embedding_score: Optional[float]
-    status: str                     # "Unauthorized" | "Safe" | "No Match"
+    status: str                     # "Unauthorized" | "Safe" | "No Match" | "Review"
+    confidence: str                 # "High" | "Medium" | "Low"
 
 
 # ── Math helpers ─────────────────────────────────────────────
@@ -64,10 +65,12 @@ def _cosine_similarity(a: List[float], b: List[float]) -> float:
     return max(0.0, min(1.0, sim))
 
 
-def _parse_embedding(raw: Optional[str]) -> Optional[List[float]]:
-    """Safely deserialize a JSON-encoded embedding vector from SQLite."""
+def _parse_embedding(raw) -> Optional[List[float]]:
+    """Safely deserialize a JSON-encoded embedding vector."""
     if not raw:
         return None
+    if isinstance(raw, list):
+        return raw if len(raw) > 0 else None
     try:
         vec = json.loads(raw)
         if isinstance(vec, list) and len(vec) > 0:
@@ -91,23 +94,26 @@ def hybrid_scan(target_id: str) -> ScanMatch:
     """
 
     # ── 1. Load target ───────────────────────────────────────
-    with get_db() as db:
-        target = db.execute(
-            "SELECT id, phash, embedding_vector FROM media WHERE id = ?",
-            (target_id,),
-        ).fetchone()
+    db = get_db()
+    
+    target_doc = db.collection("media").document(target_id).get()
+    if not target_doc.exists:
+        raise ValueError(f"Media {target_id} not found")
 
-        if not target:
-            raise ValueError(f"Media {target_id} not found")
+    target = target_doc.to_dict()
+    target_phash = target.get("phash")
+    target_embedding = _parse_embedding(target.get("embedding_vector"))
 
-        target_phash = target["phash"]
-        target_embedding = _parse_embedding(target["embedding_vector"])
-
-        # ── 2. pHash sweep ───────────────────────────────────
-        candidates = db.execute(
-            "SELECT id, phash, embedding_vector FROM media WHERE id != ?",
-            (target_id,),
-        ).fetchall()
+    # ── 2. pHash sweep ───────────────────────────────────
+    # We fetch all candidates from Firestore
+    # Instead of 'WHERE id != ?', we stream all and filter in Python
+    all_docs = db.collection("media").stream()
+    candidates = []
+    for doc in all_docs:
+        if doc.id != target_id:
+            row = doc.to_dict()
+            row["id"] = doc.id
+            candidates.append(row)
 
     if not candidates:
         return ScanMatch(
@@ -116,6 +122,7 @@ def hybrid_scan(target_id: str) -> ScanMatch:
             phash_score=0.0,
             embedding_score=None,
             status="No Match",
+            confidence="Low",
         )
 
     # Score every candidate by pHash
@@ -124,46 +131,93 @@ def hybrid_scan(target_id: str) -> ScanMatch:
         p_score = phash_score(target_phash, row["phash"])
         scored.append((row, p_score))
 
-    # Sort descending and take top-K
+    # Sort descending by pHash score
     scored.sort(key=lambda x: x[1], reverse=True)
-    top_k = scored[:TOP_K]
+
+    # Two-layer shortlist:
+    # Layer 1: top-K by pHash (catches structurally similar images)
+    top_by_phash = set(r[0]["id"] for r in scored[:TOP_K_PHASH])
+
+    # Layer 2: always include all candidates WITH an embedding vector,
+    #   up to EMBEDDING_FALLBACK_CAP — catches cropped/edited versions
+    #   where pHash is low but semantic content is similar
+    embedded_candidates = [r for r in scored if r[0].get("embedding_vector")]
+    top_by_embedding = set(r[0]["id"] for r in embedded_candidates[:EMBEDDING_FALLBACK_CAP])
+
+    # Union of both layers — deduplicated
+    top_k = [r for r in scored if r[0]["id"] in top_by_phash | top_by_embedding]
 
     # ── 3 & 4. Embedding similarity + blend ──────────────────
     best_id = None
     best_final = -1.0
     best_phash = 0.0
     best_emb = None
+    best_status = "Safe"
+    best_confidence = "Low"
 
     for row, p_sc in top_k:
-        candidate_embedding = _parse_embedding(row["embedding_vector"])
+        candidate_embedding = _parse_embedding(row.get("embedding_vector"))
 
         if target_embedding and candidate_embedding:
             e_sc = _cosine_similarity(target_embedding, candidate_embedding)
             final = (PHASH_WEIGHT * p_sc) + (EMBEDDING_WEIGHT * e_sc)
+
+            # Confidence from semantic score (most reliable signal)
+            if e_sc > 0.85:
+                confidence = "High"
+            elif e_sc > 0.70:
+                confidence = "Medium"
+            else:
+                confidence = "Low"
+
+            # Classification — embedding is primary, pHash confirms
+            if e_sc > 0.78:
+                status = "Unauthorized"   # Semantic match regardless of pHash
+            elif p_sc > 0.85:
+                status = "Unauthorized"   # Structural duplicate
+            elif final > 0.65:
+                status = "Review"         # Likely edited/cropped copy
+            elif final < 0.40:
+                status = "Safe"
+            else:
+                status = "Review"
+                
             emb_score = e_sc
         else:
             # Fallback: pHash only (full weight)
             final = p_sc
             emb_score = None
+            confidence = "Low"
+            
+            if p_sc > 0.85:
+                status = "Unauthorized"
+            elif p_sc > 0.65:
+                status = "Review"
+            else:
+                status = "Safe"
 
         if final > best_final:
             best_final = final
             best_id = row["id"]
             best_phash = p_sc
             best_emb = emb_score
+            best_status = status
+            best_confidence = confidence
 
-    # ── 5. Determine status ──────────────────────────────────
-    best_final = max(0.0, min(1.0, best_final))
-
-    if best_final > UNAUTHORIZED_THRESHOLD:
-        status = "Unauthorized"
-    else:
-        status = "Safe"
+    # If the score is extremely low, it's just random noise, so discard the match
+    if best_final < 0.25:
+        best_id = None
+        best_final = 0.0
+        best_phash = 0.0
+        best_emb = 0.0 if best_emb is not None else None
+        best_status = "Safe"
+        best_confidence = "Low"
 
     logger.info(
-        "Hybrid scan: target=%s best=%s final=%.3f (phash=%.3f, emb=%s)",
+        "Hybrid scan: target=%s best=%s final=%.3f (phash=%.3f, emb=%s, status=%s, conf=%s)",
         target_id, best_id, best_final, best_phash,
         f"{best_emb:.3f}" if best_emb is not None else "N/A",
+        best_status, best_confidence
     )
 
     return ScanMatch(
@@ -171,5 +225,6 @@ def hybrid_scan(target_id: str) -> ScanMatch:
         final_score=best_final,
         phash_score=best_phash,
         embedding_score=best_emb,
-        status=status,
+        status=best_status,
+        confidence=best_confidence,
     )

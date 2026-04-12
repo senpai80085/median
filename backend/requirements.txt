@@ -10,3 +10,6 @@ google-cloud-aiplatform
 google-generativeai
 python-dotenv
 numpy
+google-cloud-firestore
+google-cloud-storage
+requests

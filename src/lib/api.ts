@@ -1,10 +1,12 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const isProduction = import.meta.env.PROD;
+export const API_URL = import.meta.env.VITE_API_URL || (isProduction ? "" : "http://localhost:8000");
 
 export interface MediaItem {
   media_id: string;
   file_path: string;
   labels: string[];
   has_embedding: boolean;
+  upload_time?: string | null;
 }
 
 export interface UploadResponse {
@@ -16,9 +18,13 @@ export interface UploadResponse {
 
 export interface ScanResponse {
   similarity_score: number;
-  status: "Unauthorized" | "Safe" | "No Match";
+  status: "Unauthorized" | "Safe" | "No Match" | "Review";
   matched_id: string | null;
   ai_explanation: string;
+  confidence?: "High" | "Medium" | "Low";
+  embedding_score?: number;
+  phash_score?: number;
+  combined_score?: number;
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
@@ -48,4 +54,9 @@ export async function scanMedia(mediaId: string): Promise<ScanResponse> {
     body: JSON.stringify({ media_id: mediaId }),
   });
   return handleResponse<ScanResponse>(res);
+}
+
+export async function deleteMedia(mediaId: string): Promise<{ message: string; media_id: string }> {
+  const res = await fetch(`${API_URL}/media/${mediaId}`, { method: "DELETE" });
+  return handleResponse<{ message: string; media_id: string }>(res);
 }

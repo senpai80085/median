@@ -1,10 +1,12 @@
 import { Link, useLocation } from "react-router-dom";
-import { Shield, Upload, Search, LayoutDashboard } from "lucide-react";
+import { Shield, Upload, Search, LayoutDashboard, History } from "lucide-react";
 
 const navItems = [
   { to: "/", label: "Home", icon: LayoutDashboard },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/upload", label: "Upload", icon: Upload },
   { to: "/scan", label: "Scan", icon: Search },
+  { to: "/history", label: "History", icon: History },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -18,7 +20,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center group-hover:animate-pulse-glow transition-all">
               <Shield className="h-5 w-5 text-white" />
             </div>
-            <span className="gradient-text font-semibold">AI Media Guardian</span>
+            <span className="gradient-text font-semibold">Median</span>
           </Link>
           <nav className="flex items-center gap-1">
             {navItems.map(({ to, label, icon: Icon }) => (

@@ -8,6 +8,8 @@ import { Upload as UploadIcon, CheckCircle2, XCircle, Loader2, Sparkles, FileIma
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 
+import { useNavigate } from "react-router-dom";
+
 const analysisSteps = [
   "Extracting features...",
   "Comparing embeddings...",
@@ -16,28 +18,31 @@ const analysisSteps = [
 
 export default function UploadPage() {
   const [dragActive, setDragActive] = useState(false);
-  const [result, setResult] = useState<UploadResponse | null>(null);
+  const [results, setResults] = useState<UploadResponse[]>([]);
   const [analysisStep, setAnalysisStep] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const mutation = useMutation({
-    mutationFn: async (file: File) => {
+    mutationFn: async (files: File[]) => {
       // Simulate analysis steps
       const stepInterval = setInterval(() => {
         setAnalysisStep((prev) => (prev + 1) % analysisSteps.length);
       }, 800);
       
-      const result = await uploadMedia(file);
+      const uploadPromises = files.map(file => uploadMedia(file));
+      const res = await Promise.all(uploadPromises);
+      
       clearInterval(stepInterval);
-      return result;
+      return res;
     },
     onSuccess: (data) => {
-      setResult(data);
+      setResults(data);
       setAnalysisStep(0);
       queryClient.invalidateQueries({ queryKey: ["media"] });
-      toast({ title: "Upload successful", description: `Media ID: ${data.media_id}` });
+      toast({ title: "Upload successful", description: `Uploaded ${data.length} media items.` });
     },
     onError: (error: Error) => {
       setAnalysisStep(0);
@@ -45,18 +50,26 @@ export default function UploadPage() {
     },
   });
 
-  const handleFile = useCallback(
-    (file: File) => {
-      if (!file.type.startsWith("image/")) {
-        toast({ title: "Invalid file", description: "Please upload an image file.", variant: "destructive" });
-        return;
+  const handleFiles = useCallback(
+    (files: FileList | File[]) => {
+      const validFiles: File[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (!file.type.startsWith("image/")) {
+          toast({ title: "Invalid file", description: `${file.name} is not an image file. It was skipped.`, variant: "destructive" });
+          continue;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          toast({ title: "File too large", description: `${file.name} exceeds 10 MB. It was skipped.`, variant: "destructive" });
+          continue;
+        }
+        validFiles.push(file);
       }
-      if (file.size > 10 * 1024 * 1024) {
-        toast({ title: "File too large", description: "Maximum file size is 10 MB.", variant: "destructive" });
-        return;
-      }
-      setResult(null);
-      mutation.mutate(file);
+      
+      if (validFiles.length === 0) return;
+      
+      setResults([]);
+      mutation.mutate(validFiles);
     },
     [mutation, toast]
   );
@@ -65,10 +78,11 @@ export default function UploadPage() {
     (e: React.DragEvent) => {
       e.preventDefault();
       setDragActive(false);
-      const file = e.dataTransfer.files[0];
-      if (file) handleFile(file);
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleFiles(e.dataTransfer.files);
+      }
     },
-    [handleFile]
+    [handleFiles]
   );
 
   return (
@@ -93,10 +107,10 @@ export default function UploadPage() {
           type="file" 
           ref={fileInputRef}
           style={{ display: "none" }}
-          accept="image/png, image/jpeg, image/jpg, image/webp, image/gif, image/bmp" 
+          accept="image/*"
+          multiple
           onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleFile(file);
+            if (e.target.files && e.target.files.length > 0) handleFiles(e.target.files);
             e.target.value = '';
           }} 
         />
@@ -128,7 +142,7 @@ export default function UploadPage() {
                 <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mb-6 group-hover:from-primary/30 group-hover:to-accent/30 transition-colors">
                   <UploadIcon className="h-10 w-10 text-primary" />
                 </div>
-                <p className="font-semibold text-lg mb-2">Drop an image here or click to browse</p>
+                <p className="font-semibold text-lg mb-2">Drop one or more images here or click to browse</p>
                 <p className="text-sm text-muted-foreground">
                   Supports JPG, PNG, WebP, BMP, GIF up to 10 MB
                 </p>
@@ -138,40 +152,37 @@ export default function UploadPage() {
         </Card>
 
         {/* Result */}
-        {result && (
+        {results.length > 0 && (
           <Card className="glass border-primary/30 mt-6 animate-fade-in-up hover-glow">
             <CardHeader className="flex flex-row items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
                 <CheckCircle2 className="h-5 w-5 text-white" />
               </div>
-              <CardTitle className="text-lg">Upload Complete</CardTitle>
+              <CardTitle className="text-lg">Upload Complete ({results.length} files)</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="glass rounded-xl p-4">
-                <p className="text-sm text-muted-foreground mb-1">Media ID</p>
-                <p className="font-mono text-sm bg-primary/10 px-3 py-2 rounded-lg">{result.media_id}</p>
+              <div className="flex gap-4">
+                <Button
+                  variant="default"
+                  className="w-full bg-primary hover:bg-primary/90"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate("/dashboard");
+                  }}
+                >
+                  View in Dashboard
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full border-white/20 hover:bg-white/5"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setResults([]);
+                  }}
+                >
+                  Upload More
+                </Button>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">Detected Labels</p>
-                <div className="flex flex-wrap gap-2">
-                  {result.labels.map((label) => (
-                    <Badge key={label} variant="secondary" className="bg-primary/10 text-primary border-primary/20">
-                      <Sparkles className="h-3 w-3 mr-1" />
-                      {label}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                className="w-full border-white/20 hover:bg-white/5"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setResult(null);
-                }}
-              >
-                Upload Another
-              </Button>
             </CardContent>
           </Card>
         )}
