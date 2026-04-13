@@ -2,13 +2,15 @@ import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import * as THREE from "three";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Lock, Cpu, Search, Activity, ChevronRight, Play } from "lucide-react";
+import { Shield, Lock, Cpu, Search, Activity, ChevronRight, Play, Zap, Globe, Database, Network, X, Layers, Cpu as Processor } from "lucide-react";
 
 export default function Index() {
   const [isLoading, setIsLoading] = useState(true);
+  const [showBrief, setShowBrief] = useState(false);
   const [loadStep, setLoadStep] = useState(0);
   const [insightTyped, setInsightTyped] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const typedRef = useRef<HTMLSpanElement>(null);
   const statusRef = useRef<HTMLSpanElement>(null);
 
@@ -66,7 +68,7 @@ export default function Index() {
     const gridCount = 20;
     const gridGeo = new THREE.BufferGeometry();
     const gridPos = new Float32Array(gridCount * 4 * 3);
-    const gridLimit = 40;
+    const gridLimit = 60; // Larger grid
     
     for(let i = 0; i <= gridCount; i++) {
         const p = (i / gridCount - 0.5) * gridLimit;
@@ -78,9 +80,10 @@ export default function Index() {
         gridPos[i * 12 + 9] = p; gridPos[i * 12 + 10] = 0; gridPos[i * 12 + 11] = gridLimit/2;
     }
     gridGeo.setAttribute("position", new THREE.BufferAttribute(gridPos, 3));
-    const gridMat = new THREE.LineBasicMaterial({ color: 0x0891b2, transparent: true, opacity: 0.1 });
+    const gridMat = new THREE.LineBasicMaterial({ color: 0x0891b2, transparent: true, opacity: 0.02 }); // Lower opacity
     const grid = new THREE.LineSegments(gridGeo, gridMat);
-    grid.position.y = -5;
+    grid.position.y = -6;
+    grid.position.z = -15; // Further back
     scene.add(grid);
 
     // --- ENHANCED PARTICLES ---
@@ -222,33 +225,35 @@ export default function Index() {
             r.rotation.x = Math.PI/2 + Math.sin(t * 0.5 + i) * 0.1;
         });
 
-        grid.position.z = -10 + scrollNorm * 5;
-        grid.rotation.x = 0.2 + mouse.y * 0.05;
+        grid.position.z = -20 + scrollNorm * 10;
+        grid.rotation.x = 0.15 + mouse.y * 0.02;
 
-        // Neural Connection Logic (Proximity to Mouse)
+        // Optimized Neural Connection Logic
         let lineIdx = 0;
         const pPosArr = particleGeo.attributes.position.array as Float32Array;
         const mouseWorld = new THREE.Vector3(mouse.x * 15, mouse.y * 10 - scrollNorm * 7, -5);
         
-        for (let i = 0; i < particleCount && lineIdx < lineCount; i++) {
-            const px = pPosArr[i * 3];
-            const py = pPosArr[i * 3 + 1];
-            const pz = pPosArr[i * 3 + 2];
+        // Only sample a small subset of particles for connections to save CPU
+        for (let i = 0; i < 300 && lineIdx < lineCount; i++) {
+            const pIdx = Math.floor(i * (particleCount / 300));
+            const px = pPosArr[pIdx * 3];
+            const py = pPosArr[pIdx * 3 + 1];
+            const pz = pPosArr[pIdx * 3 + 2];
             
             const dx = px - mouseWorld.x;
             const dy = py - mouseWorld.y;
             const dz = pz - mouseWorld.z;
             const distSq = dx*dx + dy*dy + dz*dz;
 
-            if (distSq < 16.0) { // Radius of 4
-                // Find a nearby particle to connect to
-                for (let j = i + 1; j < Math.min(i + 20, particleCount); j++) {
-                    const px2 = pPosArr[j * 3];
-                    const py2 = pPosArr[j * 3 + 1];
-                    const pz2 = pPosArr[j * 3 + 2];
+            if (distSq < 25.0) { // Radius of 5
+                for (let j = 0; j < 10; j++) {
+                    const oIdx = (pIdx + j + 1) % particleCount;
+                    const px2 = pPosArr[oIdx * 3];
+                    const py2 = pPosArr[oIdx * 3 + 1];
+                    const pz2 = pPosArr[oIdx * 3 + 2];
                     
                     const d2 = (px-px2)*(px-px2) + (py-py2)*(py-py2) + (pz-pz2)*(pz-pz2);
-                    if (d2 < 4.0) {
+                    if (d2 < 2.0) {
                         linePositions[lineIdx * 6] = px;
                         linePositions[lineIdx * 6 + 1] = py;
                         linePositions[lineIdx * 6 + 2] = pz;
@@ -379,7 +384,10 @@ export default function Index() {
               <Play className="relative z-10 h-4 w-4 fill-white" />
               <div className="absolute inset-0 z-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
             </Link>
-            <button className="rounded-2xl border border-white/10 bg-white/5 px-12 py-5 text-[11px] font-black uppercase tracking-[0.2em] backdrop-blur-xl transition hover:bg-white/10 hover:-translate-y-1">
+            <button 
+              onClick={() => setShowBrief(true)}
+              className="rounded-2xl border border-white/10 bg-white/5 px-12 py-5 text-[11px] font-black uppercase tracking-[0.2em] backdrop-blur-xl transition hover:bg-white/10 hover:-translate-y-1"
+            >
               Architecture Brief
             </button>
           </div>
@@ -489,14 +497,16 @@ export default function Index() {
             <p className="mt-8 text-xl text-slate-400 max-w-2xl mx-auto font-medium leading-relaxed">
               Join the elite circle of enterprises ensuring multimodal content integrity across the global workspace.
             </p>
-            <div className="mt-16 flex flex-wrap justify-center gap-8">
-              <Link to="/upload" className="flex items-center gap-3 rounded-[2rem] bg-white px-14 py-6 text-[12px] font-black uppercase tracking-[0.3em] text-[#030712] transition-all hover:scale-105 hover:shadow-[0_0_40px_rgba(255,255,255,0.4)]">
-                Execute Initial Scan <ChevronRight className="h-4 w-4" />
+              <Link to="/upload" className="group relative flex items-center gap-3 rounded-[2rem] bg-cyan-600 px-14 py-6 text-[12px] font-black uppercase tracking-[0.3em] text-white transition-all hover:scale-105 hover:bg-cyan-500 hover:shadow-[0_0_40px_rgba(6,182,212,0.4)]">
+                Scan Content <ChevronRight className="h-4 w-4 relative z-10 transition-transform group-hover:translate-x-1" />
+                <div className="absolute inset-0 z-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
               </Link>
-              <button className="rounded-[2rem] border border-white/10 bg-white/5 px-14 py-6 text-[12px] font-black uppercase tracking-[0.3em] backdrop-blur-3xl transition hover:bg-white/10">
-                Contact Protocol
+              <button 
+                onClick={() => setShowBrief(true)}
+                className="rounded-[2rem] border border-white/10 bg-white/5 px-14 py-6 text-[12px] font-black uppercase tracking-[0.3em] backdrop-blur-3xl transition hover:bg-white/10"
+              >
+                Architecture Brief
               </button>
-            </div>
           </div>
         </motion.div>
       </section>
@@ -512,6 +522,121 @@ export default function Index() {
           </p>
         </div>
       </footer>
+
+      {/* Architecture Brief Overlay */}
+      <AnimatePresence>
+        {showBrief && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-2xl p-6"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="relative w-full max-w-6xl glass-obsidian rounded-[3rem] overflow-hidden border-cyan-500/30 flex flex-col md:flex-row h-[80vh]"
+            >
+              <button 
+                onClick={() => setShowBrief(false)}
+                className="absolute top-8 right-8 h-12 w-12 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 transition-colors z-50 text-white"
+              >
+                <X className="h-6 w-6" />
+              </button>
+
+              <div className="w-full md:w-1/3 p-12 border-b md:border-b-0 md:border-r border-white/5 bg-cyan-500/5">
+                <div className="h-14 w-14 rounded-2xl bg-cyan-500/10 flex items-center justify-center text-cyan-400 mb-8">
+                  <Shield className="h-7 w-7" />
+                </div>
+                <h3 className="text-3xl font-black text-white uppercase tracking-tighter mb-4">Architecture<br/><span className="text-cyan-500">Protocol-01</span></h3>
+                <p className="text-slate-400 text-sm leading-relaxed mb-8">
+                  The Media Guardian engine utilizes a proprietary hybrid tensor network for cross-domain integrity verification.
+                </p>
+                <div className="space-y-6">
+                  {[
+                    { l: "Encryption", v: "AES-512 Quantum-Ready", icon: Lock },
+                    { l: "Latency", v: "< 140ms Global E2E", icon: Zap },
+                    { l: "Accuracy", v: "99.98% Confidence", icon: Activity }
+                  ].map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-4 group">
+                      <div className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-500 group-hover:text-cyan-400 transition-colors">
+                        <item.icon className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">{item.l}</p>
+                        <p className="text-[11px] font-bold text-white">{item.v}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex-1 p-12 overflow-y-auto custom-scrollbar bg-[radial-gradient(circle_at_top_right,rgba(6,182,212,0.05),transparent_50%)]">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {[
+                    {
+                      title: "Neural Ingestion",
+                      icon: Cpu,
+                      desc: "Multimodal content decomposition using distributed validator nodes.",
+                      stats: ["4.2TB/s Throughput", "Vector Mapping"]
+                    },
+                    {
+                      title: "Consensus Layer",
+                      icon: Network,
+                      desc: "Byzantine fault-tolerant rights verification across 12 node clusters.",
+                      stats: ["Proof of Source", "Zero-Knowledge"]
+                    },
+                    {
+                      title: "Global CDN",
+                      icon: Globe,
+                      desc: "Sub-millisecond delivery via globally distributed edge architecture.",
+                      stats: ["Edge Compute", "Auto-Heal"]
+                    },
+                    {
+                      title: "Quantum DB",
+                      icon: Database,
+                      desc: "Immutable ledger tracking for permanent content provenance.",
+                      stats: ["3.4B Records", "Shard-Optimized"]
+                    }
+                  ].map((block, idx) => (
+                    <div key={idx} className="p-8 rounded-[2rem] border border-white/5 hover:border-cyan-500/20 transition-all bg-white/[0.02]">
+                      <div className="flex items-center gap-4 mb-6">
+                        <div className="h-10 w-10 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400">
+                          <block.icon className="h-5 w-5" />
+                        </div>
+                        <h4 className="text-lg font-black text-white uppercase tracking-tight">{block.title}</h4>
+                      </div>
+                      <p className="text-slate-400 text-xs leading-relaxed mb-6">{block.desc}</p>
+                      <div className="flex gap-3">
+                        {block.stats.map(s => (
+                          <span key={s} className="px-3 py-1 rounded-full bg-white/5 text-[9px] font-black text-cyan-500/70 border border-white/5">
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="mt-12 p-8 rounded-[2rem] border border-cyan-500/20 bg-cyan-500/5">
+                  <div className="flex items-center gap-4 mb-4">
+                    <Activity className="h-5 w-5 text-cyan-400" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-400">System Health: Optimal</span>
+                  </div>
+                  <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: "94%" }}
+                      className="h-full bg-gradient-to-r from-cyan-600 to-blue-500 shadow-[0_0_15px_rgba(6,182,212,0.5)]"
+                    />
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
