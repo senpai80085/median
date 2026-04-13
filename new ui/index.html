@@ -1,0 +1,1392 @@
+path=index.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Media Guardian</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg-dark:#020617;--bg-card:rgba(15,23,42,0.6);
+  --purple:#8B5CF6;--blue:#3B82F6;--cyan:#06B6D4;
+  --red:#EF4444;--green:#10B981;--yellow:#F59E0B;
+  --text:#E2E8F0;--text-dim:#94A3B8;
+}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg-dark);color:var(--text);
+  font-family:'Inter',sans-serif;overflow-x:hidden;
+  cursor:default;
+}
+::selection{background:var(--purple);color:#fff}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg-dark)}
+::-webkit-scrollbar-thumb{background:linear-gradient(var(--purple),var(--blue));border-radius:3px}
+
+/* LOADER */
+#loader{
+  position:fixed;inset:0;z-index:10000;
+  background:var(--bg-dark);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:opacity .8s,visibility .8s;
+}
+#loader.hidden{opacity:0;visibility:hidden;pointer-events:none}
+#loader .logo-mark{
+  width:80px;height:80px;position:relative;margin-bottom:40px;
+}
+#loader .logo-mark .ring{
+  position:absolute;inset:0;border:2px solid transparent;
+  border-top-color:var(--purple);border-radius:50%;
+  animation:spin 1.2s linear infinite;
+}
+#loader .logo-mark .ring:nth-child(2){
+  inset:8px;border-top-color:var(--blue);
+  animation-duration:1.8s;animation-direction:reverse;
+}
+#loader .logo-mark .ring:nth-child(3){
+  inset:16px;border-top-color:var(--cyan);
+  animation-duration:2.4s;
+}
+#loader .logo-mark .core{
+  position:absolute;inset:24px;
+  background:radial-gradient(circle,var(--purple),transparent);
+  border-radius:50%;animation:pulse 1.5s ease-in-out infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:.4;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
+#loader h2{
+  font-size:1.1rem;font-weight:600;letter-spacing:.15em;
+  text-transform:uppercase;margin-bottom:24px;
+  background:linear-gradient(90deg,var(--purple),var(--blue),var(--cyan));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+#loader .steps{display:flex;flex-direction:column;gap:12px;min-width:260px}
+#loader .step{
+  display:flex;align-items:center;gap:12px;
+  font-size:.85rem;color:var(--text-dim);
+  transition:color .4s;
+}
+#loader .step.active{color:var(--cyan)}
+#loader .step.done{color:var(--green)}
+#loader .step .dot{
+  width:8px;height:8px;border-radius:50%;
+  background:var(--text-dim);transition:background .4s,box-shadow .4s;
+  flex-shrink:0;
+}
+#loader .step.active .dot{background:var(--cyan);box-shadow:0 0 12px var(--cyan)}
+#loader .step.done .dot{background:var(--green);box-shadow:0 0 12px var(--green)}
+#loader .progress-bar{
+  width:260px;height:2px;background:rgba(148,163,184,.2);
+  border-radius:1px;margin-top:20px;overflow:hidden;
+}
+#loader .progress-bar .fill{
+  height:100%;width:0;
+  background:linear-gradient(90deg,var(--purple),var(--cyan));
+  border-radius:1px;transition:width .6s ease;
+}
+
+/* CANVAS */
+#three-canvas{
+  position:fixed;inset:0;z-index:0;
+}
+
+/* NAV */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  padding:16px 40px;
+  display:flex;align-items:center;justify-content:space-between;
+  background:rgba(2,6,23,.5);backdrop-filter:blur(20px);
+  border-bottom:1px solid rgba(139,92,246,.08);
+  transition:all .4s;
+}
+nav.scrolled{
+  padding:12px 40px;
+  background:rgba(2,6,23,.85);
+  border-bottom-color:rgba(139,92,246,.15);
+}
+.nav-logo{display:flex;align-items:center;gap:10px}
+.nav-logo svg{width:28px;height:28px}
+.nav-logo span{
+  font-weight:700;font-size:1rem;letter-spacing:-.02em;
+  background:linear-gradient(135deg,#fff,var(--text-dim));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.nav-links{display:flex;gap:32px;align-items:center}
+.nav-links a{
+  color:var(--text-dim);text-decoration:none;font-size:.85rem;
+  font-weight:500;transition:color .3s;position:relative;
+}
+.nav-links a:hover{color:#fff}
+.nav-links a::after{
+  content:'';position:absolute;bottom:-4px;left:0;
+  width:0;height:1.5px;
+  background:linear-gradient(90deg,var(--purple),var(--blue));
+  transition:width .3s;
+}
+.nav-links a:hover::after{width:100%}
+.nav-cta{
+  padding:8px 20px;border-radius:8px;
+  background:linear-gradient(135deg,var(--purple),var(--blue));
+  color:#fff;font-size:.85rem;font-weight:600;
+  border:none;cursor:pointer;transition:all .3s;
+  box-shadow:0 0 20px rgba(139,92,246,.3);
+}
+.nav-cta:hover{transform:translateY(-1px);box-shadow:0 0 30px rgba(139,92,246,.5)}
+
+/* SECTIONS CONTAINER */
+#content{position:relative;z-index:1}
+
+/* HERO */
+#hero{
+  min-height:100vh;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  text-align:center;padding:120px 20px 80px;
+  position:relative;
+}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:6px 16px;border-radius:100px;
+  background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.25);
+  font-size:.75rem;font-weight:500;color:var(--purple);
+  margin-bottom:28px;letter-spacing:.05em;text-transform:uppercase;
+  animation:fadeUp .8s ease .2s both;
+}
+.hero-badge .pulse-dot{
+  width:6px;height:6px;border-radius:50%;background:var(--green);
+  animation:pulse 2s ease-in-out infinite;
+}
+.hero-title{
+  font-size:clamp(2.5rem,6vw,4.5rem);font-weight:800;
+  line-height:1.08;letter-spacing:-.03em;
+  max-width:800px;margin-bottom:24px;
+  animation:fadeUp .8s ease .4s both;
+}
+.hero-title .gradient{
+  background:linear-gradient(135deg,var(--purple),var(--blue),var(--cyan));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.hero-sub{
+  font-size:clamp(1rem,2vw,1.25rem);color:var(--text-dim);
+  max-width:560px;line-height:1.7;font-weight:400;
+  margin-bottom:40px;animation:fadeUp .8s ease .6s both;
+}
+.hero-actions{
+  display:flex;gap:16px;flex-wrap:wrap;justify-content:center;
+  animation:fadeUp .8s ease .8s both;
+}
+.btn-primary{
+  padding:14px 32px;border-radius:12px;
+  background:linear-gradient(135deg,var(--purple),var(--blue));
+  color:#fff;font-size:1rem;font-weight:600;
+  border:none;cursor:pointer;transition:all .3s;
+  box-shadow:0 4px 30px rgba(139,92,246,.4);
+  display:flex;align-items:center;gap:8px;
+  position:relative;overflow:hidden;
+}
+.btn-primary::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,.1),transparent);
+  opacity:0;transition:opacity .3s;
+}
+.btn-primary:hover{
+  transform:translateY(-2px);
+  box-shadow:0 8px 40px rgba(139,92,246,.5);
+}
+.btn-primary:hover::before{opacity:1}
+.btn-secondary{
+  padding:14px 32px;border-radius:12px;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.1);
+  color:var(--text);font-size:1rem;font-weight:500;
+  cursor:pointer;transition:all .3s;
+  display:flex;align-items:center;gap:8px;
+}
+.btn-secondary:hover{
+  background:rgba(255,255,255,.08);
+  border-color:rgba(255,255,255,.2);
+  transform:translateY(-2px);
+}
+.hero-stats{
+  display:flex;gap:48px;margin-top:64px;
+  animation:fadeUp .8s ease 1s both;
+}
+.hero-stat{text-align:center}
+.hero-stat .num{
+  font-size:1.8rem;font-weight:800;
+  background:linear-gradient(135deg,var(--purple),var(--cyan));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.hero-stat .label{
+  font-size:.75rem;color:var(--text-dim);margin-top:4px;
+  text-transform:uppercase;letter-spacing:.08em;
+}
+.scroll-indicator{
+  position:absolute;bottom:32px;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  animation:fadeUp .8s ease 1.2s both;
+}
+.scroll-indicator span{font-size:.7rem;color:var(--text-dim);letter-spacing:.1em;text-transform:uppercase}
+.scroll-indicator .mouse{
+  width:20px;height:32px;border:1.5px solid var(--text-dim);
+  border-radius:10px;position:relative;
+}
+.scroll-indicator .mouse::after{
+  content:'';position:absolute;top:6px;left:50%;
+  width:3px;height:6px;background:var(--purple);
+  border-radius:2px;transform:translateX(-50%);
+  animation:scrollDot 2s ease-in-out infinite;
+}
+@keyframes scrollDot{0%,100%{top:6px;opacity:1}50%{top:16px;opacity:.3}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+
+/* SECTION BASE */
+.section{
+  min-height:100vh;padding:120px 40px;
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;position:relative;
+}
+.section-label{
+  font-size:.7rem;font-weight:600;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--purple);
+  margin-bottom:16px;
+}
+.section-title{
+  font-size:clamp(1.8rem,4vw,3rem);font-weight:800;
+  text-align:center;line-height:1.15;letter-spacing:-.02em;
+  max-width:700px;margin-bottom:20px;
+}
+.section-desc{
+  font-size:1rem;color:var(--text-dim);text-align:center;
+  max-width:520px;line-height:1.7;margin-bottom:56px;
+}
+
+/* HOW IT WORKS */
+.steps-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:24px;max-width:960px;width:100%;
+}
+.step-card{
+  padding:36px 28px;border-radius:16px;
+  background:rgba(15,23,42,.5);
+  border:1px solid rgba(139,92,246,.08);
+  backdrop-filter:blur(10px);
+  transition:all .5s;position:relative;overflow:hidden;
+  opacity:0;transform:translateY(40px);
+}
+.step-card.visible{opacity:1;transform:translateY(0)}
+.step-card:hover{
+  border-color:rgba(139,92,246,.25);
+  transform:translateY(-4px)!important;
+  box-shadow:0 20px 60px rgba(0,0,0,.3);
+}
+.step-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--purple),transparent);
+  opacity:0;transition:opacity .4s;
+}
+.step-card:hover::before{opacity:1}
+.step-num{
+  font-size:.65rem;font-weight:700;color:var(--purple);
+  letter-spacing:.15em;text-transform:uppercase;margin-bottom:20px;
+}
+.step-icon{
+  width:52px;height:52px;border-radius:14px;
+  background:linear-gradient(135deg,rgba(139,92,246,.15),rgba(59,130,246,.1));
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:20px;
+}
+.step-icon svg{width:24px;height:24px;stroke:var(--purple)}
+.step-card h3{
+  font-size:1.15rem;font-weight:700;margin-bottom:10px;letter-spacing:-.01em;
+}
+.step-card p{font-size:.88rem;color:var(--text-dim);line-height:1.65}
+
+/* AI PROCESS */
+#ai-process{overflow:hidden}
+.process-visual{
+  display:flex;align-items:center;gap:40px;
+  max-width:1000px;width:100%;flex-wrap:wrap;
+  justify-content:center;
+}
+.process-node{
+  padding:24px;border-radius:16px;
+  background:rgba(15,23,42,.5);border:1px solid rgba(139,92,246,.1);
+  backdrop-filter:blur(10px);text-align:center;
+  min-width:180px;opacity:0;transform:scale(.8);
+  transition:all .6s;
+}
+.process-node.visible{opacity:1;transform:scale(1)}
+.process-node .icon{
+  width:48px;height:48px;border-radius:50%;
+  background:linear-gradient(135deg,var(--purple),var(--blue));
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 14px;
+}
+.process-node .icon svg{width:22px;height:22px;stroke:#fff}
+.process-node h4{font-size:.95rem;font-weight:600;margin-bottom:6px}
+.process-node p{font-size:.78rem;color:var(--text-dim)}
+.process-arrow{
+  font-size:1.5rem;color:var(--purple);
+  opacity:0;transition:opacity .6s;
+}
+.process-arrow.visible{opacity:1}
+
+/* RESULTS */
+.results-container{
+  display:flex;gap:32px;max-width:900px;width:100%;
+  align-items:stretch;flex-wrap:wrap;justify-content:center;
+}
+.result-card{
+  flex:1;min-width:280px;max-width:420px;padding:28px;border-radius:16px;
+  background:rgba(15,23,42,.5);border:1px solid rgba(139,92,246,.08);
+  backdrop-filter:blur(10px);position:relative;overflow:hidden;
+  opacity:0;transform:translateX(-40px);transition:all .6s;
+}
+.result-card:nth-child(2){transform:translateX(40px)}
+.result-card.visible{opacity:1;transform:translateX(0)}
+.result-card .tag{
+  position:absolute;top:16px;right:16px;
+  padding:4px 12px;border-radius:100px;
+  font-size:.7rem;font-weight:600;letter-spacing:.05em;
+}
+.result-card .tag.danger{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.result-card .tag.warning{background:rgba(245,158,11,.15);color:var(--yellow);border:1px solid rgba(245,158,11,.2)}
+.result-card .image-placeholder{
+  width:100%;height:160px;border-radius:10px;
+  margin-bottom:16px;position:relative;overflow:hidden;
+}
+.result-card .image-placeholder .scan-line{
+  position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+  animation:scanDown 3s ease-in-out infinite;
+}
+@keyframes scanDown{0%{top:-2px}50%{top:100%}100%{top:-2px}}
+.result-card h4{font-size:1rem;font-weight:600;margin-bottom:6px}
+.result-card p{font-size:.82rem;color:var(--text-dim);line-height:1.6}
+.match-bar{
+  margin-top:14px;height:4px;border-radius:2px;
+  background:rgba(255,255,255,.05);overflow:hidden;
+}
+.match-bar .fill{height:100%;border-radius:2px;width:0;transition:width 1.5s ease}
+.result-card.visible .match-bar .fill{width:var(--match)}
+
+/* AI INSIGHT */
+.insight-panel{
+  max-width:640px;width:100%;padding:40px;border-radius:20px;
+  background:rgba(15,23,42,.5);border:1px solid rgba(139,92,246,.12);
+  backdrop-filter:blur(16px);position:relative;overflow:hidden;
+  opacity:0;transform:translateY(40px);transition:all .8s;
+}
+.insight-panel.visible{opacity:1;transform:translateY(0)}
+.insight-panel::before{
+  content:'';position:absolute;top:-1px;left:20%;right:20%;height:1px;
+  background:linear-gradient(90deg,transparent,var(--purple),var(--blue),transparent);
+}
+.insight-header{
+  display:flex;align-items:center;gap:12px;margin-bottom:24px;
+}
+.insight-header .ai-badge{
+  width:36px;height:36px;border-radius:10px;
+  background:linear-gradient(135deg,var(--purple),var(--blue));
+  display:flex;align-items:center;justify-content:center;
+}
+.insight-header .ai-badge svg{width:18px;height:18px;stroke:#fff}
+.insight-header h4{font-size:1rem;font-weight:600}
+.insight-header span{
+  font-size:.7rem;color:var(--cyan);
+  font-family:'JetBrains Mono',monospace;
+  margin-left:auto;
+}
+.insight-text{
+  font-size:.95rem;color:var(--text-dim);line-height:1.8;
+  border-left:2px solid var(--purple);padding-left:16px;
+  margin-bottom:24px;
+}
+.insight-text .typed-cursor{
+  display:inline-block;width:2px;height:1em;
+  background:var(--cyan);animation:blink .8s step-end infinite;
+  vertical-align:text-bottom;margin-left:2px;
+}
+@keyframes blink{50%{opacity:0}}
+.insight-metrics{display:flex;gap:16px;flex-wrap:wrap}
+.insight-metric{
+  padding:12px 18px;border-radius:10px;
+  background:rgba(139,92,246,.06);border:1px solid rgba(139,92,246,.1);
+  flex:1;min-width:120px;
+}
+.insight-metric .val{
+  font-size:1.2rem;font-weight:700;
+  background:linear-gradient(135deg,var(--purple),var(--cyan));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.insight-metric .lbl{
+  font-size:.68rem;color:var(--text-dim);margin-top:2px;
+  text-transform:uppercase;letter-spacing:.06em;
+}
+
+/* FEATURES */
+.features-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  gap:20px;max-width:960px;width:100%;
+}
+.feature-card{
+  padding:28px;border-radius:14px;
+  background:rgba(15,23,42,.4);border:1px solid rgba(139,92,246,.06);
+  transition:all .4s;opacity:0;transform:translateY(30px);
+}
+.feature-card.visible{opacity:1;transform:translateY(0)}
+.feature-card:hover{
+  border-color:rgba(139,92,246,.2);
+  background:rgba(15,23,42,.6);
+  transform:translateY(-3px)!important;
+}
+.feature-card .f-icon{
+  width:40px;height:40px;border-radius:10px;
+  background:linear-gradient(135deg,rgba(139,92,246,.12),rgba(59,130,246,.08));
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:16px;
+}
+.feature-card .f-icon svg{width:20px;height:20px;stroke:var(--purple)}
+.feature-card h4{font-size:.95rem;font-weight:600;margin-bottom:8px}
+.feature-card p{font-size:.82rem;color:var(--text-dim);line-height:1.6}
+
+/* CTA SECTION */
+#cta{
+  text-align:center;padding:100px 40px 120px;
+}
+.cta-box{
+  max-width:600px;margin:0 auto;padding:56px 40px;
+  border-radius:24px;position:relative;overflow:hidden;
+  background:linear-gradient(135deg,rgba(139,92,246,.08),rgba(59,130,246,.06));
+  border:1px solid rgba(139,92,246,.12);
+}
+.cta-box::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at top,rgba(139,92,246,.1),transparent 60%);
+}
+.cta-box h2{
+  font-size:clamp(1.6rem,3vw,2.2rem);font-weight:800;
+  margin-bottom:14px;position:relative;letter-spacing:-.02em;
+}
+.cta-box p{
+  font-size:1rem;color:var(--text-dim);margin-bottom:32px;
+  position:relative;
+}
+.cta-box .btn-primary{margin:0 auto;position:relative}
+
+/* FOOTER */
+footer{
+  padding:40px;text-align:center;
+  border-top:1px solid rgba(255,255,255,.04);
+}
+footer p{font-size:.78rem;color:var(--text-dim)}
+
+/* ANIMATED GRID BG */
+.grid-bg{
+  position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(139,92,246,.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(139,92,246,.03) 1px,transparent 1px);
+  background-size:60px 60px;
+  mask-image:radial-gradient(ellipse at center,black 30%,transparent 70%);
+}
+
+/* MOBILE */
+@media(max-width:768px){
+  nav{padding:12px 20px}
+  .nav-links{display:none}
+  .section{padding:80px 20px}
+  .steps-grid{grid-template-columns:1fr}
+  .results-container{flex-direction:column;align-items:center}
+  .result-card{min-width:unset;width:100%}
+  .hero-stats{gap:24px;flex-wrap:wrap;justify-content:center}
+  .process-visual{flex-direction:column;gap:20px}
+  .process-arrow{transform:rotate(90deg)!important}
+  .insight-panel{padding:28px 20px}
+  .features-grid{grid-template-columns:1fr}
+  #hero{padding:100px 20px 60px}
+  .cta-box{padding:40px 24px}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="logo-mark">
+    <div class="ring"></div>
+    <div class="ring"></div>
+    <div class="ring"></div>
+    <div class="core"></div>
+  </div>
+  <h2>Initializing AI Engine</h2>
+  <div class="steps">
+    <div class="step" id="ls1"><div class="dot"></div>Loading neural models...</div>
+    <div class="step" id="ls2"><div class="dot"></div>Preparing analysis pipeline...</div>
+    <div class="step" id="ls3"><div class="dot"></div>Calibrating detection engine...</div>
+    <div class="step" id="ls4"><div class="dot"></div>System ready</div>
+  </div>
+  <div class="progress-bar"><div class="fill" id="loader-fill"></div></div>
+</div>
+
+<!-- GRID BG -->
+<div class="grid-bg"></div>
+
+<!-- 3D CANVAS -->
+<canvas id="three-canvas"></canvas>
+
+<!-- NAV -->
+<nav id="navbar">
+  <div class="nav-logo">
+    <svg viewBox="0 0 28 28" fill="none">
+      <circle cx="14" cy="14" r="12" stroke="url(#ng)" stroke-width="1.5"/>
+      <circle cx="14" cy="14" r="6" stroke="url(#ng)" stroke-width="1.5"/>
+      <line x1="14" y1="2" x2="14" y2="8" stroke="url(#ng)" stroke-width="1.5"/>
+      <line x1="14" y1="20" x2="14" y2="26" stroke="url(#ng)" stroke-width="1.5"/>
+      <line x1="2" y1="14" x2="8" y2="14" stroke="url(#ng)" stroke-width="1.5"/>
+      <line x1="20" y1="14" x2="26" y2="14" stroke="url(#ng)" stroke-width="1.5"/>
+      <defs><linearGradient id="ng" x1="0" y1="0" x2="28" y2="28"><stop stop-color="#8B5CF6"/><stop offset="1" stop-color="#06B6D4"/></linearGradient></defs>
+    </svg>
+    <span>AI Media Guardian</span>
+  </div>
+  <div class="nav-links">
+    <a href="#how-it-works">How It Works</a>
+    <a href="#ai-process">AI Process</a>
+    <a href="#results">Results</a>
+    <a href="#features">Features</a>
+  </div>
+  <button class="nav-cta">Get Started</button>
+</nav>
+
+<!-- CONTENT -->
+<div id="content">
+
+  <!-- HERO -->
+  <section id="hero">
+    <div class="hero-badge">
+      <div class="pulse-dot"></div>
+      AI-Powered Protection
+    </div>
+    <h1 class="hero-title">
+      Protect Your Digital<br>Assets with <span class="gradient">AI</span>
+    </h1>
+    <p class="hero-sub">
+      Detect unauthorized media usage using advanced AI and explainable analysis.
+      Powered by perceptual hashing, semantic embeddings, and multimodal reasoning.
+    </p>
+    <div class="hero-actions">
+      <button class="btn-primary" id="scan-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        Start AI Scan
+      </button>
+      <button class="btn-secondary">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Watch Demo
+      </button>
+    </div>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="num">99.7%</div><div class="label">Detection Rate</div></div>
+      <div class="hero-stat"><div class="num">&lt;50ms</div><div class="label">Analysis Time</div></div>
+      <div class="hero-stat"><div class="num">10M+</div><div class="label">Media Scanned</div></div>
+    </div>
+    <div class="scroll-indicator">
+      <div class="mouse"></div>
+      <span>Scroll to explore</span>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="section" id="how-it-works">
+    <div class="section-label">How It Works</div>
+    <h2 class="section-title">Three Steps to Total Protection</h2>
+    <p class="section-desc">Our AI pipeline analyzes your media through multiple detection layers for comprehensive coverage.</p>
+    <div class="steps-grid">
+      <div class="step-card" data-anim="step">
+        <div class="step-num">Step 01</div>
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <h3>Upload Media</h3>
+        <p>Upload your images, videos, or audio. Our system ingests and fingerprints each asset automatically.</p>
+      </div>
+      <div class="step-card" data-anim="step">
+        <div class="step-num">Step 02</div>
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 014 4c0 1.95-2 4-4 8-2-4-4-6.05-4-8a4 4 0 014-4z"/><circle cx="12" cy="14" r="3"/><path d="M7 19h10"/></svg>
+        </div>
+        <h3>AI Analysis</h3>
+        <p>Multiple AI models — pHash, embeddings, and Gemini — analyze content for matches and manipulation.</p>
+      </div>
+      <div class="step-card" data-anim="step">
+        <div class="step-num">Step 03</div>
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        </div>
+        <h3>Detection + Explanation</h3>
+        <p>Get detailed results with explainable AI insights. Understand exactly why content was flagged.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- AI PROCESS -->
+  <section class="section" id="ai-process">
+    <div class="section-label">AI Pipeline</div>
+    <h2 class="section-title">Multi-Model Intelligence</h2>
+    <p class="section-desc">Your media flows through our advanced detection pipeline for comprehensive analysis.</p>
+    <div class="process-visual">
+      <div class="process-node" data-anim="node">
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+        </div>
+        <h4>Media Input</h4>
+        <p>Raw digital assets</p>
+      </div>
+      <div class="process-arrow" data-anim="arrow">→</div>
+      <div class="process-node" data-anim="node">
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 4l16 16"/><path d="M20 4L4 20"/><path d="M12 4v16"/><path d="M4 12h16"/></svg>
+        </div>
+        <h4>pHash</h4>
+        <p>Perceptual fingerprint</p>
+      </div>
+      <div class="process-arrow" data-anim="arrow">→</div>
+      <div class="process-node" data-anim="node">
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4m10-10h-4M6 12H2m15.07-7.07l-2.83 2.83M9.76 14.24l-2.83 2.83m0-10.14l2.83 2.83m4.48 4.48l2.83 2.83"/></svg>
+        </div>
+        <h4>Embeddings</h4>
+        <p>Semantic similarity</p>
+      </div>
+      <div class="process-arrow" data-anim="arrow">→</div>
+      <div class="process-node" data-anim="node">
+        <div class="icon" style="background:linear-gradient(135deg,var(--cyan),var(--blue))">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.27 5.82 21 7 14.14l-5-4.87 6.91-1.01L12 2z"/></svg>
+        </div>
+        <h4>Gemini AI</h4>
+        <p>Multimodal reasoning</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section class="section" id="results">
+    <div class="section-label">Detection Results</div>
+    <h2 class="section-title">Precision Detection at Scale</h2>
+    <p class="section-desc">See how our AI identifies unauthorized usage with confidence scoring and visual indicators.</p>
+    <div class="results-container">
+      <div class="result-card" data-anim="result">
+        <div class="tag danger">Unauthorized</div>
+        <div class="image-placeholder" style="background:linear-gradient(135deg,rgba(239,68,68,.12),rgba(139,92,246,.08))">
+          <div class="scan-line"></div>
+          <svg style="position:absolute;inset:0;width:100%;height:100%;opacity:.15" viewBox="0 0 200 160"><rect x="20" y="20" width="60" height="45" rx="4" fill="#EF4444"/><rect x="90" y="30" width="90" height="8" rx="2" fill="#8B5CF6"/><rect x="90" y="48" width="70" height="6" rx="2" fill="#64748B"/><rect x="20" y="80" width="160" height="6" rx="2" fill="#334155"/><rect x="20" y="96" width="160" height="6" rx="2" fill="#334155"/><rect x="20" y="112" width="120" height="6" rx="2" fill="#334155"/><rect x="20" y="134" width="50" height="14" rx="4" fill="#EF4444"/></svg>
+        </div>
+        <h4>Image: beach_sunset_02.jpg</h4>
+        <p>97.3% match with your original asset. Detected on 3 external domains. Cropped and color-shifted variant.</p>
+        <div class="match-bar"><div class="fill" style="--match:97.3%;background:linear-gradient(90deg,var(--red),#F97316)"></div></div>
+      </div>
+      <div class="result-card" data-anim="result">
+        <div class="tag warning">Needs Review</div>
+        <div class="image-placeholder" style="background:linear-gradient(135deg,rgba(245,158,11,.1),rgba(139,92,246,.06))">
+          <div class="scan-line"></div>
+          <svg style="position:absolute;inset:0;width:100%;height:100%;opacity:.15" viewBox="0 0 200 160"><circle cx="50" cy="50" r="30" fill="#F59E0B"/><rect x="90" y="30" width="90" height="8" rx="2" fill="#8B5CF6"/><rect x="90" y="48" width="70" height="6" rx="2" fill="#64748B"/><rect x="20" y="95" width="160" height="6" rx="2" fill="#334155"/><rect x="20" y="111" width="160" height="6" rx="2" fill="#334155"/><rect x="20" y="127" width="80" height="6" rx="2" fill="#334155"/></svg>
+        </div>
+        <h4>Image: product_photo_14.png</h4>
+        <p>68.1% semantic similarity. Subject posture matches but different background. AI recommends manual review.</p>
+        <div class="match-bar"><div class="fill" style="--match:68.1%;background:linear-gradient(90deg,var(--yellow),#FB923C)"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AI INSIGHT -->
+  <section class="section" id="insight">
+    <div class="section-label">Explainable AI</div>
+    <h2 class="section-title">Understand Every Decision</h2>
+    <p class="section-desc">Our AI doesn't just detect — it explains. Get human-readable reasoning for every flagged asset.</p>
+    <div class="insight-panel" data-anim="insight">
+      <div class="insight-header">
+        <div class="ai-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 014 4c0 1.95-2 4-4 8-2-4-4-6.05-4-8a4 4 0 014-4z"/><circle cx="12" cy="14" r="3"/><path d="M7 19h10"/></svg>
+        </div>
+        <h4>AI Insight</h4>
+        <span id="insight-status">analyzing...</span>
+      </div>
+      <div class="insight-text" id="insight-text">
+        <span id="typed-text"></span><span class="typed-cursor"></span>
+      </div>
+      <div class="insight-metrics">
+        <div class="insight-metric"><div class="val" id="metric-hash">—</div><div class="lbl">pHash Match</div></div>
+        <div class="insight-metric"><div class="val" id="metric-embed">—</div><div class="lbl">Embedding Sim</div></div>
+        <div class="insight-metric"><div class="val" id="metric-conf">—</div><div class="lbl">Confidence</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="section" id="features">
+    <div class="section-label">Capabilities</div>
+    <h2 class="section-title">Built for Scale & Precision</h2>
+    <p class="section-desc">Enterprise-grade features to protect your digital media at every level.</p>
+    <div class="features-grid">
+      <div class="feature-card" data-anim="feature">
+        <div class="f-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <h4>IP Protection</h4>
+        <p>Continuous monitoring across the web for unauthorized usage of your assets.</p>
+      </div>
+      <div class="feature-card" data-anim="feature">
+        <div class="f-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+        <h4>Real-time Scanning</h4>
+        <p>Sub-50ms analysis per asset with parallel multi-model processing pipeline.</p>
+      </div>
+      <div class="feature-card" data-anim="feature">
+        <div class="f-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg></div>
+        <h4>Dashboard & Reports</h4>
+        <p>Comprehensive analytics dashboard with exportable reports and audit trails.</p>
+      </div>
+      <div class="feature-card" data-anim="feature">
+        <div class="f-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg></div>
+        <h4>API Integration</h4>
+        <p>RESTful API with SDKs for Python, Node.js, and Go. Integrate in minutes.</p>
+      </div>
+      <div class="feature-card" data-anim="feature">
+        <div class="f-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg></div>
+        <h4>Global Coverage</h4>
+        <p>Monitor across all major platforms, social media, and content networks worldwide.</p>
+      </div>
+      <div class="feature-card" data-anim="feature">
+        <div class="f-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div>
+        <h4>Explainable Results</h4>
+        <p>Every detection comes with AI-generated explanations in plain language.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section id="cta" class="section">
+    <div class="cta-box">
+      <h2>Ready to Protect<br>Your Content?</h2>
+      <p style="color:var(--text-dim)">Start scanning your media with AI-powered detection in under 60 seconds.</p>
+      <button class="btn-primary">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        Get Started Free
+      </button>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <p>&copy; 2025 AI Media Guardian. All rights reserved. Powered by advanced AI.</p>
+  </footer>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.176.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.176.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+/* ============== LOADER ============== */
+const loader = document.getElementById('loader');
+const steps = ['ls1','ls2','ls3','ls4'];
+const fill = document.getElementById('loader-fill');
+let loadStep = 0;
+
+function advanceLoader(){
+  if(loadStep < steps.length){
+    const el = document.getElementById(steps[loadStep]);
+    if(loadStep > 0) document.getElementById(steps[loadStep-1]).classList.replace('active','done');
+    el.classList.add('active');
+    fill.style.width = ((loadStep+1)/steps.length*100)+'%';
+    loadStep++;
+    if(loadStep < steps.length) setTimeout(advanceLoader, 600);
+    else {
+      setTimeout(()=>{ el.classList.replace('active','done'); }, 400);
+      setTimeout(()=>{ loader.classList.add('hidden'); }, 1000);
+    }
+  }
+}
+setTimeout(advanceLoader, 300);
+
+/* ============== THREE.JS SCENE ============== */
+const canvas = document.getElementById('three-canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x020617, 0.035);
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 100);
+camera.position.set(0, 0, 12);
+
+/* Mouse tracking */
+const mouse = { x: 0, y: 0, tx: 0, ty: 0 };
+document.addEventListener('mousemove', e => {
+  mouse.tx = (e.clientX / window.innerWidth - 0.5) * 2;
+  mouse.ty = -(e.clientY / window.innerHeight - 0.5) * 2;
+});
+
+/* Scroll tracking */
+let scrollY = 0, scrollTarget = 0;
+window.addEventListener('scroll', () => { scrollTarget = window.scrollY; });
+
+/* ============== MATERIALS & SHADERS ============== */
+
+/* Particle system for background */
+const particleCount = 2000;
+const particleGeo = new THREE.BufferGeometry();
+const pPositions = new Float32Array(particleCount * 3);
+const pColors = new Float32Array(particleCount * 3);
+const pSizes = new Float32Array(particleCount);
+const pSpeeds = new Float32Array(particleCount);
+
+for(let i = 0; i < particleCount; i++){
+  pPositions[i*3]   = (Math.random()-0.5)*40;
+  pPositions[i*3+1] = (Math.random()-0.5)*40;
+  pPositions[i*3+2] = (Math.random()-0.5)*30 - 5;
+  const c = new THREE.Color().setHSL(0.7 + Math.random()*0.15, 0.8, 0.4+Math.random()*0.3);
+  pColors[i*3]   = c.r;
+  pColors[i*3+1] = c.g;
+  pColors[i*3+2] = c.b;
+  pSizes[i] = Math.random() * 3 + 0.5;
+  pSpeeds[i] = Math.random() * 0.5 + 0.2;
+}
+particleGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+particleGeo.setAttribute('color', new THREE.BufferAttribute(pColors, 3));
+particleGeo.setAttribute('size', new THREE.BufferAttribute(pSizes, 1));
+
+const particleMat = new THREE.ShaderMaterial({
+  uniforms: {
+    uTime: { value: 0 },
+    uScroll: { value: 0 },
+  },
+  vertexShader: `
+    attribute float size;
+    attribute vec3 color;
+    varying vec3 vColor;
+    varying float vAlpha;
+    uniform float uTime;
+    uniform float uScroll;
+    void main(){
+      vColor = color;
+      vec3 pos = position;
+      pos.y += sin(uTime * 0.3 + position.x * 0.5) * 0.3;
+      pos.x += cos(uTime * 0.2 + position.z * 0.3) * 0.2;
+      pos.y -= uScroll * 0.002;
+      float d = length(pos.xy);
+      vAlpha = smoothstep(20.0, 5.0, d) * 0.7;
+      vec4 mv = modelViewMatrix * vec4(pos, 1.0);
+      gl_PointSize = size * (200.0 / -mv.z);
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragmentShader: `
+    varying vec3 vColor;
+    varying float vAlpha;
+    void main(){
+      float d = length(gl_PointCoord - 0.5);
+      if(d > 0.5) discard;
+      float alpha = smoothstep(0.5, 0.1, d) * vAlpha;
+      gl_FragColor = vec4(vColor, alpha);
+    }
+  `,
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+});
+const particles = new THREE.Points(particleGeo, particleMat);
+scene.add(particles);
+
+/* ============== FLOATING IMAGE CARDS ============== */
+const cardGroup = new THREE.Group();
+scene.add(cardGroup);
+
+const cardData = [
+  { color: 0x8B5CF6, status: 'safe', x: -3.5, y: 1.5, z: -2 },
+  { color: 0x3B82F6, status: 'danger', x: 2.8, y: 2, z: -1 },
+  { color: 0x06B6D4, status: 'safe', x: -2, y: -1.5, z: -3 },
+  { color: 0x8B5CF6, status: 'warning', x: 3.5, y: -1, z: -2.5 },
+  { color: 0x3B82F6, status: 'safe', x: -4.5, y: 0, z: -1.5 },
+  { color: 0x06B6D4, status: 'danger', x: 4.2, y: 0.5, z: -3 },
+  { color: 0x8B5CF6, status: 'safe', x: 0, y: 3, z: -2 },
+  { color: 0x3B82F6, status: 'safe', x: -1, y: -3, z: -1 },
+];
+
+const cards = [];
+
+function createCard(data){
+  const group = new THREE.Group();
+
+  /* Card plane */
+  const geo = new THREE.PlaneGeometry(1.4, 1, 8, 8);
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uColor: { value: new THREE.Color(data.color) },
+      uHover: { value: 0 },
+      uStatus: { value: data.status === 'danger' ? 1.0 : data.status === 'warning' ? 0.5 : 0.0 },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      varying vec3 vPos;
+      uniform float uTime;
+      void main(){
+        vUv = uv;
+        vec3 pos = position;
+        pos.z += sin(uTime * 2.0 + uv.x * 3.14) * 0.02;
+        vPos = pos;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+      }
+    `,
+    fragmentShader: `
+      varying vec2 vUv;
+      varying vec3 vPos;
+      uniform vec3 uColor;
+      uniform float uTime;
+      uniform float uHover;
+      uniform float uStatus;
+      void main(){
+        /* Card base */
+        vec3 bg = vec3(0.06, 0.09, 0.16);
+        
+        /* Content lines */
+        float line1 = smoothstep(0.0, 0.01, abs(vUv.y - 0.7) - 0.04) < 1.0 && vUv.x > 0.1 && vUv.x < 0.6 ? 1.0 : 0.0;
+        float line2 = smoothstep(0.0, 0.01, abs(vUv.y - 0.5) - 0.025) < 1.0 && vUv.x > 0.1 && vUv.x < 0.85 ? 1.0 : 0.0;
+        float line3 = smoothstep(0.0, 0.01, abs(vUv.y - 0.35) - 0.025) < 1.0 && vUv.x > 0.1 && vUv.x < 0.7 ? 1.0 : 0.0;
+        
+        /* Image placeholder */
+        float img = (vUv.x > 0.65 && vUv.x < 0.9 && vUv.y > 0.55 && vUv.y < 0.85) ? 1.0 : 0.0;
+        
+        vec3 col = bg;
+        col = mix(col, uColor * 0.3, (line1 + line2 + line3) * 0.5);
+        col = mix(col, uColor * 0.4, img * 0.6);
+        
+        /* Border glow */
+        float border = 1.0 - smoothstep(0.0, 0.03, min(min(vUv.x, 1.0-vUv.x), min(vUv.y, 1.0-vUv.y)));
+        vec3 borderColor = uStatus > 0.8 ? vec3(0.94,0.27,0.27) : uStatus > 0.3 ? vec3(0.96,0.62,0.04) : vec3(0.06,0.73,0.51);
+        float glowPulse = uStatus > 0.3 ? (sin(uTime * 3.0) * 0.3 + 0.7) : 0.4;
+        col += borderColor * border * glowPulse;
+        
+        /* Hover highlight */
+        col += uColor * uHover * 0.15;
+        
+        /* Glass effect */
+        float alpha = 0.75 + border * 0.25 + uHover * 0.1;
+        
+        /* Scan line effect */
+        float scanY = fract(uTime * 0.15);
+        float scan = smoothstep(0.0, 0.02, abs(vUv.y - scanY)) < 1.0 ? 0.3 : 0.0;
+        col += vec3(0.02, 0.73, 0.83) * scan;
+        
+        gl_FragColor = vec4(col, alpha);
+      }
+    `,
+    transparent: true,
+    side: THREE.DoubleSide,
+  });
+
+  const mesh = new THREE.Mesh(geo, mat);
+  group.add(mesh);
+
+  /* Glow plane behind card */
+  const glowGeo = new THREE.PlaneGeometry(2, 1.5);
+  const statusColor = data.status === 'danger' ? new THREE.Color(0xEF4444) :
+                       data.status === 'warning' ? new THREE.Color(0xF59E0B) :
+                       new THREE.Color(0x10B981);
+  const glowMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uColor: { value: statusColor },
+      uTime: { value: 0 },
+      uIntensity: { value: data.status === 'safe' ? 0.08 : 0.2 },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main(){
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      varying vec2 vUv;
+      uniform vec3 uColor;
+      uniform float uTime;
+      uniform float uIntensity;
+      void main(){
+        float d = length(vUv - 0.5) * 2.0;
+        float alpha = smoothstep(1.0, 0.0, d) * uIntensity;
+        alpha *= (sin(uTime * 2.0) * 0.2 + 0.8);
+        gl_FragColor = vec4(uColor, alpha);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const glow = new THREE.Mesh(glowGeo, glowMat);
+  glow.position.z = -0.05;
+  group.add(glow);
+
+  group.position.set(data.x, data.y, data.z);
+  group.userData = {
+    basePos: new THREE.Vector3(data.x, data.y, data.z),
+    phase: Math.random() * Math.PI * 2,
+    speed: 0.3 + Math.random() * 0.4,
+    mesh, mat, glowMat,
+  };
+
+  cardGroup.add(group);
+  cards.push(group);
+}
+
+cardData.forEach(createCard);
+
+/* ============== NEURAL NETWORK LINES ============== */
+const networkGroup = new THREE.Group();
+scene.add(networkGroup);
+
+const linesMat = new THREE.ShaderMaterial({
+  uniforms: {
+    uTime: { value: 0 },
+    uOpacity: { value: 0.15 },
+  },
+  vertexShader: `
+    attribute float lineProgress;
+    varying float vProgress;
+    uniform float uTime;
+    void main(){
+      vProgress = lineProgress;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    varying float vProgress;
+    uniform float uTime;
+    uniform float uOpacity;
+    void main(){
+      float pulse = sin(vProgress * 6.28 - uTime * 3.0) * 0.5 + 0.5;
+      vec3 col = mix(vec3(0.545, 0.361, 0.965), vec3(0.024, 0.714, 0.831), vProgress);
+      float alpha = pulse * uOpacity;
+      gl_FragColor = vec4(col, alpha);
+    }
+  `,
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+});
+
+/* Connect some cards with neural lines */
+for(let i = 0; i < cards.length; i++){
+  for(let j = i+1; j < cards.length; j++){
+    if(Math.random() > 0.5) continue;
+    const a = cards[i].userData.basePos;
+    const b = cards[j].userData.basePos;
+    const points = [];
+    const progArr = [];
+    const segs = 20;
+    for(let s = 0; s <= segs; s++){
+      const t = s / segs;
+      const mid = new THREE.Vector3().lerpVectors(a, b, t);
+      mid.z += Math.sin(t * Math.PI) * 0.8;
+      points.push(mid.x, mid.y, mid.z);
+      progArr.push(t);
+    }
+    const lineGeo = new THREE.BufferGeometry();
+    lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+    lineGeo.setAttribute('lineProgress', new THREE.Float32BufferAttribute(progArr, 1));
+    const line = new THREE.Line(lineGeo, linesMat.clone());
+    networkGroup.add(line);
+  }
+}
+
+/* ============== AI CORE (Central glowing sphere) ============== */
+const coreGroup = new THREE.Group();
+scene.add(coreGroup);
+
+const coreGeo = new THREE.IcosahedronGeometry(0.6, 4);
+const coreMat = new THREE.ShaderMaterial({
+  uniforms: {
+    uTime: { value: 0 },
+  },
+  vertexShader: `
+    varying vec3 vNormal;
+    varying vec3 vPos;
+    varying vec2 vUv;
+    uniform float uTime;
+    void main(){
+      vNormal = normal;
+      vUv = uv;
+      vec3 pos = position;
+      pos += normal * sin(uTime * 2.0 + position.y * 5.0) * 0.03;
+      vPos = pos;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+    }
+  `,
+  fragmentShader: `
+    varying vec3 vNormal;
+    varying vec3 vPos;
+    uniform float uTime;
+    void main(){
+      float fresnel = pow(1.0 - abs(dot(vNormal, vec3(0.0, 0.0, 1.0))), 2.5);
+      vec3 c1 = vec3(0.545, 0.361, 0.965);
+      vec3 c2 = vec3(0.024, 0.714, 0.831);
+      vec3 col = mix(c1, c2, fresnel);
+      col += vec3(1.0) * pow(fresnel, 4.0) * 0.5;
+      float alpha = 0.3 + fresnel * 0.6;
+      float pulse = sin(uTime * 3.0) * 0.1 + 0.9;
+      gl_FragColor = vec4(col * pulse, alpha);
+    }
+  `,
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+});
+const core = new THREE.Mesh(coreGeo, coreMat);
+coreGroup.add(core);
+
+/* Core rings */
+for(let i = 0; i < 3; i++){
+  const ringGeo = new THREE.TorusGeometry(0.9 + i * 0.3, 0.008, 8, 64);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color().setHSL(0.72 - i * 0.05, 0.8, 0.5),
+    transparent: true,
+    opacity: 0.2 - i * 0.05,
+  });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.userData.rotSpeed = (i + 1) * 0.3;
+  ring.userData.axis = i;
+  coreGroup.add(ring);
+}
+
+coreGroup.position.set(0, 0, -2);
+
+/* ============== SCAN BEAM ============== */
+const beamGeo = new THREE.PlaneGeometry(20, 0.05);
+const beamMat = new THREE.ShaderMaterial({
+  uniforms: {
+    uTime: { value: 0 },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main(){
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    varying vec2 vUv;
+    uniform float uTime;
+    void main(){
+      float alpha = smoothstep(0.0, 0.5, vUv.x) * smoothstep(1.0, 0.5, vUv.x);
+      vec3 col = mix(vec3(0.545, 0.361, 0.965), vec3(0.024, 0.714, 0.831), vUv.x);
+      alpha *= 0.4;
+      gl_FragColor = vec4(col, alpha);
+    }
+  `,
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+});
+const beam = new THREE.Mesh(beamGeo, beamMat);
+beam.position.z = -1;
+scene.add(beam);
+
+/* ============== LIGHTS ============== */
+const ambientLight = new THREE.AmbientLight(0x8B5CF6, 0.1);
+scene.add(ambientLight);
+
+/* ============== SCROLL ANIMATIONS (INTERSECTION OBSERVER) ============== */
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if(e.isIntersecting){
+      const el = e.target;
+      const delay = el.dataset.delay || 0;
+      setTimeout(() => el.classList.add('visible'), delay * 1000);
+    }
+  });
+}, { threshold: 0.2 });
+
+document.querySelectorAll('.step-card').forEach((el, i) => {
+  el.dataset.delay = i * 0.15;
+  observer.observe(el);
+});
+document.querySelectorAll('.process-node, .process-arrow').forEach((el, i) => {
+  el.dataset.delay = i * 0.12;
+  observer.observe(el);
+});
+document.querySelectorAll('.result-card').forEach((el, i) => {
+  el.dataset.delay = i * 0.2;
+  observer.observe(el);
+});
+document.querySelectorAll('.feature-card').forEach((el, i) => {
+  el.dataset.delay = i * 0.1;
+  observer.observe(el);
+});
+
+/* Insight typing animation */
+const insightPanel = document.querySelector('.insight-panel');
+const insightText = "This image matches the original with 97.3% confidence due to similar subject posture, background composition, and color distribution. The crop margins and color shift suggest intentional modification to avoid detection. Perceptual hash distance: 4 bits. Semantic embedding cosine similarity: 0.946.";
+let insightTyped = false;
+
+const insightObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if(e.isIntersecting){
+      e.target.classList.add('visible');
+      if(!insightTyped){
+        insightTyped = true;
+        typeInsight();
+      }
+    }
+  });
+}, { threshold: 0.3 });
+insightObserver.observe(insightPanel);
+
+function typeInsight(){
+  const el = document.getElementById('typed-text');
+  const status = document.getElementById('insight-status');
+  let i = 0;
+  status.textContent = 'generating...';
+  status.style.color = 'var(--yellow)';
+  const interval = setInterval(()=>{
+    if(i < insightText.length){
+      el.textContent += insightText[i];
+      i++;
+    } else {
+      clearInterval(interval);
+      status.textContent = 'complete';
+      status.style.color = 'var(--green)';
+      /* Animate metrics */
+      animateMetric('metric-hash', '96.1%', 800);
+      animateMetric('metric-embed', '0.946', 1000);
+      animateMetric('metric-conf', '97.3%', 1200);
+    }
+  }, 18);
+}
+
+function animateMetric(id, target, delay){
+  setTimeout(()=>{
+    document.getElementById(id).textContent = target;
+    document.getElementById(id).style.transition = 'transform .3s';
+    document.getElementById(id).style.transform = 'scale(1.1)';
+    setTimeout(()=>{
+      document.getElementById(id).style.transform = 'scale(1)';
+    }, 300);
+  }, delay);
+}
+
+/* ============== NAV SCROLL EFFECT ============== */
+const nav = document.getElementById('navbar');
+window.addEventListener('scroll', ()=>{
+  nav.classList.toggle('scrolled', window.scrollY > 50);
+});
+
+/* ============== SCAN BUTTON EFFECT ============== */
+document.getElementById('scan-btn').addEventListener('click', ()=>{
+  /* Trigger a flash on all cards */
+  cards.forEach(c => {
+    c.userData.mat.uniforms.uHover.value = 1;
+    setTimeout(()=>{ c.userData.mat.uniforms.uHover.value = 0; }, 600);
+  });
+});
+
+/* ============== ANIMATION LOOP ============== */
+const clock = new THREE.Clock();
+
+function animate(){
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  const dt = clock.getDelta();
+
+  /* Smooth mouse */
+  mouse.x += (mouse.tx - mouse.x) * 0.05;
+  mouse.y += (mouse.ty - mouse.y) * 0.05;
+  scrollY += (scrollTarget - scrollY) * 0.08;
+
+  const scrollNorm = scrollY / (document.body.scrollHeight - window.innerHeight || 1);
+
+  /* Camera parallax */
+  camera.position.x = mouse.x * 0.8;
+  camera.position.y = mouse.y * 0.5 - scrollNorm * 4;
+  camera.lookAt(0, -scrollNorm * 4, -2);
+
+  /* Particles */
+  particleMat.uniforms.uTime.value = t;
+  particleMat.uniforms.uScroll.value = scrollY;
+
+  /* Cards float */
+  cards.forEach(c => {
+    const ud = c.userData;
+    c.position.x = ud.basePos.x + Math.sin(t * ud.speed + ud.phase) * 0.3 + mouse.x * 0.15;
+    c.position.y = ud.basePos.y + Math.cos(t * ud.speed * 0.7 + ud.phase) * 0.2 + mouse.y * 0.1;
+    c.rotation.y = Math.sin(t * 0.5 + ud.phase) * 0.15 + mouse.x * 0.05;
+    c.rotation.x = Math.cos(t * 0.3 + ud.phase) * 0.08 + mouse.y * 0.03;
+    ud.mat.uniforms.uTime.value = t;
+    ud.glowMat.uniforms.uTime.value = t;
+  });
+
+  /* Card group fades with scroll */
+  const heroFade = Math.max(0, 1 - scrollNorm * 4);
+  cardGroup.visible = heroFade > 0.01;
+  if(cardGroup.visible){
+    cardGroup.children.forEach(c => {
+      c.traverse(ch => {
+        if(ch.material && ch.material.uniforms && ch.material.uniforms.uOpacity !== undefined){
+          ch.material.uniforms.uOpacity.value = heroFade * 0.15;
+        }
+        if(ch.material && ch.material.opacity !== undefined && !ch.material.uniforms){
+          ch.material.opacity = heroFade;
+        }
+      });
+    });
+  }
+
+  /* Neural network lines */
+  networkGroup.children.forEach(l => {
+    if(l.material.uniforms){
+      l.material.uniforms.uTime.value = t;
+      l.material.uniforms.uOpacity.value = 0.08 + Math.sin(t + scrollNorm * 10) * 0.05;
+    }
+  });
+
+  /* AI Core */
+  coreMat.uniforms.uTime.value = t;
+  coreGroup.rotation.y = t * 0.2;
+  coreGroup.children.forEach(child => {
+    if(child.userData.rotSpeed){
+      const axis = child.userData.axis;
+      if(axis === 0) child.rotation.x = t * child.userData.rotSpeed;
+      else if(axis === 1) child.rotation.y = t * child.userData.rotSpeed;
+      else child.rotation.z = t * child.userData.rotSpeed;
+    }
+  });
+
+  /* Core moves based on scroll */
+  const targetCoreY = -scrollNorm * 8;
+  coreGroup.position.y += (targetCoreY - coreGroup.position.y) * 0.05;
+
+  /* Scan beam */
+  beam.position.y = Math.sin(t * 0.5) * 4;
+  beam.material.uniforms.uTime.value = t;
+
+  renderer.render(scene, camera);
+}
+animate();
+
+/* ============== RESIZE ============== */
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+</script>
+</body>
+</html>

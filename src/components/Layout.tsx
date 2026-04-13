@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 import { Shield, Upload, Search, LayoutDashboard, History } from "lucide-react";
 
 const navItems = [
@@ -9,7 +9,7 @@ const navItems = [
   { to: "/history", label: "History", icon: History },
 ];
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+export default function Layout() {
   const location = useLocation();
 
   return (
@@ -40,7 +40,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
       </header>
-      <main className="flex-1">{children}</main>
+      <main className="flex-1">
+        <Outlet />
+      </main>
       <footer className="border-t border-white/10 py-6">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
           <p>Powered by Google AI</p>
