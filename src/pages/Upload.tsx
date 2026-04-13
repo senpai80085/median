@@ -89,16 +89,16 @@ export default function UploadPage() {
     <div className="min-h-[calc(100vh-8rem)] flex items-center justify-center py-12">
       <div className="container mx-auto px-4 max-w-2xl">
         {/* Header */}
-        <div className="text-center mb-8 animate-fade-in-up">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass text-sm text-muted-foreground mb-4">
-            <FileImage className="h-4 w-4 text-primary" />
-            <span>Media Upload</span>
+        <div className="text-center mb-12 animate-fade-in-up">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[10px] font-black uppercase tracking-widest text-cyan-400 mb-6">
+            <Sparkles className="h-3 w-3" />
+            <span>Secure Ingestion Portal</span>
           </div>
-          <h1 className="text-4xl font-bold mb-3">
-            Upload <span className="gradient-text">Media</span>
+          <h1 className="text-4xl font-black mb-4 tracking-tight">
+            Ingest <span className="text-cyan-500 italic">Media Asset</span>
           </h1>
-          <p className="text-muted-foreground">
-            Upload an image to extract labels and generate an embedding vector.
+          <p className="text-slate-400 text-sm max-w-md mx-auto leading-relaxed">
+            Submit content for structural fingerprinting and multimodal attribution analysis.
           </p>
         </div>
 
@@ -117,34 +117,36 @@ export default function UploadPage() {
 
         {/* Drop zone */}
         <Card
-          className={`glass border-2 border-dashed transition-all duration-300 cursor-pointer animate-fade-in-up animate-delay-100 ${
-            dragActive ? "border-primary bg-primary/10 shadow-lg shadow-primary/20" : "border-white/10 hover:border-primary/50"
+          className={`bg-[#030712]/40 backdrop-blur-3xl border-2 border-dashed transition-all duration-500 cursor-pointer animate-fade-in-up animate-delay-100 rounded-[2.5rem] ${
+            dragActive ? "border-cyan-500 bg-cyan-500/5 shadow-2xl shadow-cyan-500/10" : "border-white/5 hover:border-cyan-500/40"
           }`}
           onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
           onDragLeave={() => setDragActive(false)}
           onDrop={onDrop}
           onClick={() => fileInputRef.current?.click()}
         >
-          <CardContent className="flex flex-col items-center justify-center py-20 text-center">
+          <CardContent className="flex flex-col items-center justify-center py-24 text-center">
             {mutation.isPending ? (
-              <div className="space-y-6 w-full max-w-xs">
-                <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center animate-pulse-glow">
-                  <Loader2 className="h-10 w-10 text-white animate-spin" />
+              <div className="space-y-8 w-full max-w-xs">
+                <div className="w-24 h-24 mx-auto rounded-[2rem] bg-gradient-to-br from-cyan-600 to-blue-700 flex items-center justify-center shadow-2xl shadow-cyan-500/20">
+                  <Loader2 className="h-12 w-12 text-white animate-spin" />
                 </div>
                 <div>
-                  <p className="font-semibold text-lg mb-2">Analyzing with AI...</p>
-                  <p className="text-sm text-primary animate-pulse">{analysisSteps[analysisStep]}</p>
+                  <p className="font-black text-xs uppercase tracking-[0.2em] mb-3 text-cyan-500">Processing Neural Mesh</p>
+                  <p className="text-sm text-slate-300 italic font-medium">"{analysisSteps[analysisStep]}"</p>
                 </div>
-                <Progress value={(analysisStep + 1) * 33} className="h-2" />
+                <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-full bg-cyan-500 transition-all duration-500" style={{ width: `${(analysisStep + 1) * 33}%` }} />
+                </div>
               </div>
             ) : (
               <>
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mb-6 group-hover:from-primary/30 group-hover:to-accent/30 transition-colors">
-                  <UploadIcon className="h-10 w-10 text-primary" />
+                <div className="w-20 h-20 rounded-2xl bg-cyan-500/5 border border-cyan-500/20 flex items-center justify-center mb-8 group-hover:bg-cyan-500/10 transition-colors">
+                  <UploadIcon className="h-10 w-10 text-cyan-500" />
                 </div>
-                <p className="font-semibold text-lg mb-2">Drop one or more images here or click to browse</p>
-                <p className="text-sm text-muted-foreground">
-                  Supports JPG, PNG, WebP, BMP, GIF up to 10 MB
+                <p className="font-bold text-lg mb-2 text-white">Drop assets here or click to browse</p>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-widest">
+                  High-Resolution JPG, PNG, WebP supported
                 </p>
               </>
             )}

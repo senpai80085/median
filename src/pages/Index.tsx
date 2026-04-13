@@ -1,28 +1,35 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import * as THREE from "three";
+import { motion, AnimatePresence } from "framer-motion";
+import { Shield, Lock, Cpu, Search, Activity, ChevronRight, Play } from "lucide-react";
 
 export default function Index() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadStep, setLoadStep] = useState(0);
   const [insightTyped, setInsightTyped] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const insightRef = useRef<HTMLDivElement>(null);
   const typedRef = useRef<HTMLSpanElement>(null);
   const statusRef = useRef<HTMLSpanElement>(null);
 
-  // --- LOADER LOGIC ---
+  // --- LOADER LOGIC (SESSION-BASED) ---
   useEffect(() => {
-    const steps = ["Loading neural models...", "Preparing analysis pipeline...", "Calibrating detection engine...", "System ready"];
+    const hasBooted = sessionStorage.getItem("mg_booted");
+    if (hasBooted) {
+      setIsLoading(false);
+      return;
+    }
+
+    const steps = ["Initializing Neural Mesh...", "Calibrating Vision Models...", "Establishing Secure Handshake...", "Core Active"];
     const advanceLoader = () => {
       if (loadStep < steps.length) {
-        setTimeout(() => {
-          setLoadStep(prev => prev + 1);
-        }, 600);
+        const delay = loadStep === 0 ? 800 : 600;
+        setTimeout(() => setLoadStep(prev => prev + 1), delay);
       } else {
         setTimeout(() => {
           setIsLoading(false);
-        }, 1200);
+          sessionStorage.setItem("mg_booted", "true");
+        }, 1000);
       }
     };
     if (isLoading) advanceLoader();
@@ -37,16 +44,13 @@ export default function Index() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.2;
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x020617, 0.035);
-
     const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
     camera.position.set(0, 0, 12);
 
     // Mouse tracking
-    const mouse = { x: 0, y: 0, tx: 0, ty: 0 };
+    const mouse = { x: 0, y: 0, tx: 0, ty: 0, radius: 0 };
     const onMouseMove = (e: MouseEvent) => {
       mouse.tx = (e.clientX / window.innerWidth - 0.5) * 2;
       mouse.ty = -(e.clientY / window.innerHeight - 0.5) * 2;
@@ -58,29 +62,65 @@ export default function Index() {
     const onScroll = () => { scrollTarget = window.scrollY; };
     window.addEventListener("scroll", onScroll);
 
-    // --- PARTICLES ---
-    const particleCount = 2000;
+    // --- HOLOGRAPHIC GRID ---
+    const gridCount = 20;
+    const gridGeo = new THREE.BufferGeometry();
+    const gridPos = new Float32Array(gridCount * 4 * 3);
+    const gridLimit = 40;
+    
+    for(let i = 0; i <= gridCount; i++) {
+        const p = (i / gridCount - 0.5) * gridLimit;
+        // X Lines
+        gridPos[i * 12] = -gridLimit/2; gridPos[i * 12 + 1] = 0; gridPos[i * 12 + 2] = p;
+        gridPos[i * 12 + 3] = gridLimit/2; gridPos[i * 12 + 4] = 0; gridPos[i * 12 + 5] = p;
+        // Z Lines
+        gridPos[i * 12 + 6] = p; gridPos[i * 12 + 7] = 0; gridPos[i * 12 + 8] = -gridLimit/2;
+        gridPos[i * 12 + 9] = p; gridPos[i * 12 + 10] = 0; gridPos[i * 12 + 11] = gridLimit/2;
+    }
+    gridGeo.setAttribute("position", new THREE.BufferAttribute(gridPos, 3));
+    const gridMat = new THREE.LineBasicMaterial({ color: 0x0891b2, transparent: true, opacity: 0.1 });
+    const grid = new THREE.LineSegments(gridGeo, gridMat);
+    grid.position.y = -5;
+    scene.add(grid);
+
+    // --- ENHANCED PARTICLES ---
+    const particleCount = 1500;
     const particleGeo = new THREE.BufferGeometry();
     const pPositions = new Float32Array(particleCount * 3);
+    const pOriginals = new Float32Array(particleCount * 3);
     const pColors = new Float32Array(particleCount * 3);
     const pSizes = new Float32Array(particleCount);
 
+    const color1 = new THREE.Color(0x06b6d4);
+    const color2 = new THREE.Color(0x3b82f6);
+
     for (let i = 0; i < particleCount; i++) {
-        pPositions[i * 3] = (Math.random() - 0.5) * 40;
-        pPositions[i * 3 + 1] = (Math.random() - 0.5) * 40;
-        pPositions[i * 3 + 2] = (Math.random() - 0.5) * 30 - 5;
-        const color = new THREE.Color().setHSL(0.7 + Math.random() * 0.15, 0.8, 0.4 + Math.random() * 0.3);
-        pColors[i * 3] = color.r;
-        pColors[i * 3 + 1] = color.g;
-        pColors[i * 3 + 2] = color.b;
-        pSizes[i] = Math.random() * 3 + 0.5;
+        const x = (Math.random() - 0.5) * 40;
+        const y = (Math.random() - 0.5) * 40;
+        const z = (Math.random() - 0.5) * 30 - 5;
+        pPositions[i * 3] = x;
+        pPositions[i * 3 + 1] = y;
+        pPositions[i * 3 + 2] = z;
+        pOriginals[i * 3] = x;
+        pOriginals[i * 3 + 1] = y;
+        pOriginals[i * 3 + 2] = z;
+        
+        const mixedColor = color1.clone().lerp(color2, Math.random());
+        pColors[i * 3] = mixedColor.r;
+        pColors[i * 3 + 1] = mixedColor.g;
+        pColors[i * 3 + 2] = mixedColor.b;
+        pSizes[i] = Math.random() * 2 + 1;
     }
     particleGeo.setAttribute("position", new THREE.BufferAttribute(pPositions, 3));
     particleGeo.setAttribute("color", new THREE.BufferAttribute(pColors, 3));
     particleGeo.setAttribute("size", new THREE.BufferAttribute(pSizes, 1));
 
     const particleMat = new THREE.ShaderMaterial({
-        uniforms: { uTime: { value: 0 }, uScroll: { value: 0 } },
+        uniforms: { 
+          uTime: { value: 0 }, 
+          uScroll: { value: 0 },
+          uMouse: { value: new THREE.Vector2(0, 0) }
+        },
         vertexShader: `
             attribute float size;
             attribute vec3 color;
@@ -88,16 +128,21 @@ export default function Index() {
             varying float vAlpha;
             uniform float uTime;
             uniform float uScroll;
+            uniform vec2 uMouse;
             void main() {
                 vColor = color;
                 vec3 pos = position;
-                pos.y += sin(uTime * 0.3 + position.x * 0.5) * 0.3;
-                pos.x += cos(uTime * 0.2 + position.z * 0.3) * 0.2;
+                
+                // Reactive Mouse Force
+                float dist = distance(pos.xy, uMouse * 10.0);
+                float force = (1.0 - smoothstep(0.0, 4.0, dist)) * 2.0;
+                pos.xy += normalize(pos.xy - uMouse * 10.0) * force;
+
+                pos.y += sin(uTime * 0.2 + position.x * 0.5) * 0.2;
                 pos.y -= uScroll * 0.002;
-                float d = length(pos.xy);
-                vAlpha = smoothstep(20.0, 5.0, d) * 0.7;
+                vAlpha = smoothstep(25.0, 2.0, length(pos.xy)) * 0.6;
                 vec4 mv = modelViewMatrix * vec4(pos, 1.0);
-                gl_PointSize = size * (200.0 / -mv.z);
+                gl_PointSize = size * (180.0 / -mv.z);
                 gl_Position = projectionMatrix * mv;
             }
         `,
@@ -107,8 +152,7 @@ export default function Index() {
             void main() {
                 float d = length(gl_PointCoord - 0.5);
                 if(d > 0.5) discard;
-                float alpha = smoothstep(0.5, 0.1, d) * vAlpha;
-                gl_FragColor = vec4(vColor, alpha);
+                gl_FragColor = vec4(vColor, (1.0 - d * 2.0) * vAlpha);
             }
         `,
         transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -116,158 +160,115 @@ export default function Index() {
     const particles = new THREE.Points(particleGeo, particleMat);
     scene.add(particles);
 
-    // --- CARDS ---
-    const cardGroup = new THREE.Group();
-    scene.add(cardGroup);
-    const cards: THREE.Group[] = [];
-    const cardData = [
-        { color: 0x8B5CF6, status: "safe", x: -3.5, y: 1.5, z: -2 },
-        { color: 0x3B82F6, status: "danger", x: 2.8, y: 2, z: -1 },
-        { color: 0x06B6D4, status: "safe", x: -2, y: -1.5, z: -3 },
-        { color: 0x8B5CF6, status: "warning", x: 3.5, y: -1, z: -2.5 },
-        { color: 0x3B82F6, status: "safe", x: -4.5, y: 0, z: -1.5 },
-        { color: 0x06B6D4, status: "danger", x: 4.2, y: 0.5, z: -3 },
-        { color: 0x8B5CF6, status: "safe", x: 0, y: 3, z: -2 },
-        { color: 0x3B82F6, status: "safe", x: -1, y: -3, z: -1 },
-    ];
+    // --- NEURAL CONNECTIONS ---
+    const lineCount = 150;
+    const lineGeo = new THREE.BufferGeometry();
+    const linePositions = new Float32Array(lineCount * 3 * 2);
+    lineGeo.setAttribute("position", new THREE.BufferAttribute(linePositions, 3));
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending });
+    const lines = new THREE.LineSegments(lineGeo, lineMat);
+    scene.add(lines);
 
-    const createCard = (data: any) => {
-        const group = new THREE.Group();
-        const geo = new THREE.PlaneGeometry(1.4, 1, 8, 8);
-        const mat = new THREE.ShaderMaterial({
-            uniforms: {
-                uTime: { value: 0 }, uColor: { value: new THREE.Color(data.color) },
-                uHover: { value: 0 }, uStatus: { value: data.status === "danger" ? 1.0 : data.status === "warning" ? 0.5 : 0.0 }
-            },
-            vertexShader: `
-                varying vec2 vUv;
-                uniform float uTime;
-                void main() {
-                    vUv = uv;
-                    vec3 pos = position;
-                    pos.z += sin(uTime * 2.0 + uv.x * 3.14) * 0.02;
-                    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-                }
-            `,
-            fragmentShader: `
-                varying vec2 vUv;
-                uniform vec3 uColor;
-                uniform float uTime;
-                uniform float uHover;
-                uniform float uStatus;
-                void main() {
-                    vec3 bg = vec3(0.06, 0.09, 0.16);
-                    float line1 = smoothstep(0.0, 0.01, abs(vUv.y - 0.7) - 0.04) < 1.0 && vUv.x > 0.1 && vUv.x < 0.6 ? 1.0 : 0.0;
-                    float line2 = smoothstep(0.0, 0.01, abs(vUv.y - 0.5) - 0.025) < 1.0 && vUv.x > 0.1 && vUv.x < 0.85 ? 1.0 : 0.0;
-                    float line3 = smoothstep(0.0, 0.01, abs(vUv.y - 0.35) - 0.025) < 1.0 && vUv.x > 0.1 && vUv.x < 0.7 ? 1.0 : 0.0;
-                    float img = (vUv.x > 0.65 && vUv.x < 0.9 && vUv.y > 0.55 && vUv.y < 0.85) ? 1.0 : 0.0;
-                    vec3 col = bg;
-                    col = mix(col, uColor * 0.3, (line1 + line2 + line3) * 0.5);
-                    col = mix(col, uColor * 0.4, img * 0.6);
-                    float border = 1.0 - smoothstep(0.0, 0.03, min(min(vUv.x, 1.0-vUv.x), min(vUv.y, 1.0-vUv.y)));
-                    vec3 borderColor = uStatus > 0.8 ? vec3(0.94,0.27,0.27) : uStatus > 0.3 ? vec3(0.96,0.62,0.04) : vec3(0.06,0.73,0.51);
-                    float glowPulse = uStatus > 0.3 ? (sin(uTime * 3.0) * 0.3 + 0.7) : 0.4;
-                    col += borderColor * border * glowPulse;
-                    col += uColor * uHover * 0.15;
-                    float alpha = 0.75 + border * 0.25 + uHover * 0.1;
-                    float scanY = fract(uTime * 0.15);
-                    float scan = smoothstep(0.0, 0.02, abs(vUv.y - scanY)) < 1.0 ? 0.3 : 0.0;
-                    col += vec3(0.02, 0.73, 0.83) * scan;
-                    gl_FragColor = vec4(col, alpha);
-                }
-            `,
-            transparent: true, side: THREE.DoubleSide,
-        });
-        const mesh = new THREE.Mesh(geo, mat);
-        group.add(mesh);
-
-        const glowGeo = new THREE.PlaneGeometry(2, 1.5);
-        const statusColor = data.status === "danger" ? new THREE.Color(0xEF4444) : data.status === "warning" ? new THREE.Color(0xF59E0B) : new THREE.Color(0x10B981);
-        const glowMat = new THREE.ShaderMaterial({
-            uniforms: { uColor: { value: statusColor }, uTime: { value: 0 }, uIntensity: { value: data.status === "safe" ? 0.08 : 0.2 } },
-            vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
-            fragmentShader: `varying vec2 vUv; uniform vec3 uColor; uniform float uTime; uniform float uIntensity; void main(){ float d=length(vUv-0.5)*2.0; float alpha=smoothstep(1.0,0.0,d)*uIntensity; alpha*=(sin(uTime*2.0)*0.2+0.8); gl_FragColor=vec4(uColor,alpha); }`,
-            transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-        });
-        const glow = new THREE.Mesh(glowGeo, glowMat);
-        glow.position.z = -0.05;
-        group.add(glow);
-
-        group.position.set(data.x, data.y, data.z);
-        group.userData = { basePos: new THREE.Vector3(data.x, data.y, data.z), phase: Math.random() * Math.PI * 2, speed: 0.3 + Math.random() * 0.4, mat, glowMat };
-        cardGroup.add(group);
-        cards.push(group);
-    };
-    cardData.forEach(createCard);
+    // --- ORBITAL RINGS ---
+    const ringGroup = new THREE.Group();
+    scene.add(ringGroup);
+    const ringMat = new THREE.LineBasicMaterial({ color: 0x0891b2, transparent: true, opacity: 0.15 });
+    
+    [1.8, 2.4, 3.2].forEach((radius, i) => {
+        const ringGeo = new THREE.TorusGeometry(radius, 0.01, 16, 100);
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = Math.PI / 2 + (Math.random() - 0.5) * 0.5;
+        ring.rotation.y = (Math.random() - 0.5) * 0.5;
+        ringGroup.add(ring);
+    });
 
     // --- CORE ---
     const coreGroup = new THREE.Group();
     scene.add(coreGroup);
-    const coreGeo = new THREE.IcosahedronGeometry(0.6, 4);
     const coreMat = new THREE.ShaderMaterial({
         uniforms: { uTime: { value: 0 } },
-        vertexShader: `varying vec3 vNormal; uniform float uTime; void main(){ vNormal=normal; vec3 pos=position+normal*sin(uTime*2.0+position.y*5.0)*0.03; gl_Position=projectionMatrix*modelViewMatrix*vec4(pos,1.0); }`,
-        fragmentShader: `varying vec3 vNormal; uniform float uTime; void main(){ float fresnel=pow(1.0-abs(dot(vNormal,vec3(0.0,0.0,1.0))),2.5); vec3 col=mix(vec3(0.545,0.361,0.965),vec3(0.024,0.714,0.831),fresnel); col+=vec3(1.0)*pow(fresnel,4.0)*0.5; gl_FragColor=vec4(col*(sin(uTime*3.0)*0.1+0.9),0.3+fresnel*0.6); }`,
+        vertexShader: `varying vec3 vNormal; uniform float uTime; void main(){ vNormal=normal; vec3 pos=position+normal*sin(uTime*1.5+position.y*4.0)*0.03; gl_Position=projectionMatrix*modelViewMatrix*vec4(pos,1.0); }`,
+        fragmentShader: `varying vec3 vNormal; uniform float uTime; void main(){ float fresnel=pow(1.0-abs(dot(vNormal,vec3(0.0,0.0,1.0))),3.0); vec3 col=mix(vec3(0.06,0.71,0.83),vec3(0.03,0.1,0.4),fresnel); gl_FragColor=vec4(col, 0.3 + fresnel * 0.7); }`,
         transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     });
-    coreGroup.add(new THREE.Mesh(coreGeo, coreMat));
-    
-    for(let i=0; i<3; i++) {
-        const r = new THREE.Mesh(new THREE.TorusGeometry(0.9+i*0.3, 0.008, 8, 64), new THREE.MeshBasicMaterial({ color: new THREE.Color().setHSL(0.72-i*0.05, 0.8, 0.5), transparent: true, opacity: 0.2-i*0.05 }));
-        r.userData = { rotSpeed: (i+1)*0.3, axis: i };
-        coreGroup.add(r);
-    }
-    coreGroup.position.set(0, 0, -2);
-
-    const beam = new THREE.Mesh(new THREE.PlaneGeometry(20, 0.05), new THREE.ShaderMaterial({
-        uniforms: { uTime: { value: 0 } },
-        vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
-        fragmentShader: `varying vec2 vUv; uniform float uTime; void main(){ float alpha=smoothstep(0.0,0.5,vUv.x)*smoothstep(1.0,0.5,vUv.x)*0.4; gl_FragColor=vec4(mix(vec3(0.545,0.361,0.965),vec3(0.024,0.714,0.831),vUv.x),alpha); }`,
-        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    }));
-    beam.position.z = -1;
-    scene.add(beam);
+    coreGroup.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.8, 5), coreMat));
+    coreGroup.position.set(0, 0, -3);
 
     const clock = new THREE.Clock();
+    let frameId: number;
     const animate = () => {
         const t = clock.getElapsedTime();
-        scrollY += (scrollTarget - scrollY) * 0.08;
-        mouse.x += (mouse.tx - mouse.x) * 0.05;
-        mouse.y += (mouse.ty - mouse.y) * 0.05;
+        scrollY += (scrollTarget - scrollY) * 0.07;
+        mouse.x += (mouse.tx - mouse.x) * 0.07;
+        mouse.y += (mouse.ty - mouse.y) * 0.07;
 
         const scrollNorm = scrollY / (document.body.scrollHeight - window.innerHeight || 1);
-        camera.position.x = mouse.x * 0.8;
-        camera.position.y = mouse.y * 0.5 - scrollNorm * 4;
-        camera.lookAt(0, -scrollNorm * 4, -2);
+        camera.position.x = mouse.x * 0.6;
+        camera.position.y = mouse.y * 0.4 - scrollNorm * 7;
+        camera.lookAt(0, -scrollNorm * 7, -5);
 
         particleMat.uniforms.uTime.value = t;
         particleMat.uniforms.uScroll.value = scrollY;
+        particleMat.uniforms.uMouse.value.set(mouse.x, mouse.y);
         
-        cards.forEach(c => {
-            const ud = c.userData;
-            c.position.x = ud.basePos.x + Math.sin(t * ud.speed + ud.phase) * 0.3 + mouse.x * 0.15;
-            c.position.y = ud.basePos.y + Math.cos(t * ud.speed * 0.7 + ud.phase) * 0.2 + mouse.y * 0.1;
-            c.rotation.y = Math.sin(t * 0.5 + ud.phase) * 0.15 + mouse.x * 0.05;
-            ud.mat.uniforms.uTime.value = t;
-            ud.glowMat.uniforms.uTime.value = t;
+        coreMat.uniforms.uTime.value = t;
+        coreGroup.position.y = -scrollNorm * 12;
+        coreGroup.rotation.y = t * 0.3;
+        coreGroup.rotation.z = t * 0.2;
+
+        ringGroup.position.copy(coreGroup.position);
+        ringGroup.children.forEach((r, i) => {
+            r.rotation.z = t * (0.1 + i * 0.05);
+            r.rotation.x = Math.PI/2 + Math.sin(t * 0.5 + i) * 0.1;
         });
 
-        coreMat.uniforms.uTime.value = t;
-        coreGroup.rotation.y = t * 0.2;
-        coreGroup.children.forEach(child => {
-            if(child.userData.rotSpeed) {
-                const axis = child.userData.axis;
-                if(axis === 0) child.rotation.x = t * child.userData.rotSpeed;
-                else if(axis === 1) child.rotation.y = t * child.userData.rotSpeed;
-                else child.rotation.z = t * child.userData.rotSpeed;
+        grid.position.z = -10 + scrollNorm * 5;
+        grid.rotation.x = 0.2 + mouse.y * 0.05;
+
+        // Neural Connection Logic (Proximity to Mouse)
+        let lineIdx = 0;
+        const pPosArr = particleGeo.attributes.position.array as Float32Array;
+        const mouseWorld = new THREE.Vector3(mouse.x * 15, mouse.y * 10 - scrollNorm * 7, -5);
+        
+        for (let i = 0; i < particleCount && lineIdx < lineCount; i++) {
+            const px = pPosArr[i * 3];
+            const py = pPosArr[i * 3 + 1];
+            const pz = pPosArr[i * 3 + 2];
+            
+            const dx = px - mouseWorld.x;
+            const dy = py - mouseWorld.y;
+            const dz = pz - mouseWorld.z;
+            const distSq = dx*dx + dy*dy + dz*dz;
+
+            if (distSq < 16.0) { // Radius of 4
+                // Find a nearby particle to connect to
+                for (let j = i + 1; j < Math.min(i + 20, particleCount); j++) {
+                    const px2 = pPosArr[j * 3];
+                    const py2 = pPosArr[j * 3 + 1];
+                    const pz2 = pPosArr[j * 3 + 2];
+                    
+                    const d2 = (px-px2)*(px-px2) + (py-py2)*(py-py2) + (pz-pz2)*(pz-pz2);
+                    if (d2 < 4.0) {
+                        linePositions[lineIdx * 6] = px;
+                        linePositions[lineIdx * 6 + 1] = py;
+                        linePositions[lineIdx * 6 + 2] = pz;
+                        linePositions[lineIdx * 6 + 3] = px2;
+                        linePositions[lineIdx * 6 + 4] = py2;
+                        linePositions[lineIdx * 6 + 5] = pz2;
+                        lineIdx++;
+                        break;
+                    }
+                }
             }
-        });
-        coreGroup.position.y += (-scrollNorm * 8 - coreGroup.position.y) * 0.05;
-        beam.position.y = Math.sin(t * 0.5) * 4;
-        beam.material.uniforms.uTime.value = t;
+        }
+        // Fill remaining lines off-screen
+        for(let i = lineIdx; i < lineCount; i++) {
+            linePositions[i * 6] = 1000;
+        }
+        lineGeo.attributes.position.needsUpdate = true;
 
         renderer.render(scene, camera);
-        requestAnimationFrame(animate);
+        frameId = requestAnimationFrame(animate);
     };
     animate();
 
@@ -282,36 +283,16 @@ export default function Index() {
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("scroll", onScroll);
         window.removeEventListener("resize", onResize);
+        cancelAnimationFrame(frameId);
         renderer.dispose();
     };
   }, [isLoading]);
 
-  // --- INTERSECTION OBSERVER ---
-  useEffect(() => {
-    if (isLoading) return;
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(e => {
-            if(e.isIntersecting) {
-                e.target.classList.add("visible");
-                if (e.target.classList.contains("insight-panel") && !insightTyped) {
-                    setInsightTyped(true);
-                    typeInsight();
-                }
-            }
-        });
-    }, { threshold: 0.2 });
-
-    document.querySelectorAll(".step-card, .process-node, .process-arrow, .result-card, .feature-card, .insight-panel").forEach(el => observer.observe(el));
-    return () => observer.disconnect();
-  }, [isLoading, insightTyped]);
-
   const typeInsight = () => {
-    const text = "This image matches the original with 97.3% confidence due to similar subject posture, background composition, and color distribution. The crop margins and color shift suggest intentional modification to avoid detection. Perceptual hash distance: 4 bits. Semantic embedding cosine similarity: 0.946.";
+    if (insightTyped) return;
+    setInsightTyped(true);
+    const text = "Decision Engine: Asset attribution complete. Semantic match found at 98.4% confidence. Structural fingerprint indicates 12% pixel manipulation. Recommended Action: IP Rights Enforcement.";
     let i = 0;
-    if (statusRef.current) {
-        statusRef.current.textContent = "generating...";
-        statusRef.current.style.color = "#F59E0B";
-    }
     const interval = setInterval(() => {
         if (typedRef.current) {
             if (i < text.length) {
@@ -320,153 +301,217 @@ export default function Index() {
             } else {
                 clearInterval(interval);
                 if (statusRef.current) {
-                    statusRef.current.textContent = "complete";
-                    statusRef.current.style.color = "#10B981";
+                    statusRef.current.textContent = "VERIFIED_TRUST";
+                    statusRef.current.classList.add("text-cyan-400");
                 }
             }
         }
-    }, 18);
+    }, 15);
   };
 
   return (
-    <div className="new-ui-root relative min-h-screen bg-[#020617] text-slate-100 selection:bg-violet-500 selection:text-white">
-      {/* LOADER */}
-      {isLoading && (
-        <div id="loader" className="fixed inset-0 z-[10000] flex flex-col items-center justify-center bg-[#020617] transition-opacity duration-700">
-          <div className="relative mb-10 h-20 w-20">
-            <div className="absolute inset-0 animate-[spin_1.2s_linear_infinite] rounded-full border-2 border-transparent border-t-violet-500" />
-            <div className="absolute inset-2 animate-[spin_1.8s_linear_infinite_reverse] rounded-full border-2 border-transparent border-t-blue-500" />
-            <div className="absolute inset-4 animate-[spin_2.4s_linear_infinite] rounded-full border-2 border-transparent border-t-cyan-500" />
-            <div className="absolute inset-6 animate-pulse rounded-full bg-[radial-gradient(circle,theme(colors.violet.500),transparent)]" />
-          </div>
-          <h2 className="mb-6 text-lg font-semibold uppercase tracking-[0.15em] bg-gradient-to-r from-violet-500 via-blue-500 to-cyan-500 bg-clip-text text-transparent">
-            Initializing AI Engine
-          </h2>
-          <div className="flex flex-col gap-3 min-w-[260px]">
-            {["Loading neural models...", "Preparing analysis pipeline...", "Calibrating detection engine...", "System ready"].map((step, idx) => (
-              <div key={idx} className={`flex items-center gap-3 text-xs transition-colors duration-300 ${idx < loadStep ? "text-emerald-500" : idx === loadStep ? "text-cyan-400" : "text-slate-500"}`}>
-                <div className={`h-2 w-2 rounded-full ${idx < loadStep ? "bg-emerald-500 shadow-[0_0_8px_theme(colors.emerald.500)]" : idx === loadStep ? "bg-cyan-400 shadow-[0_0_8px_theme(colors.cyan.400)]" : "bg-slate-600"}`} />
-                {step}
+    <div className="new-ui-root relative min-h-screen bg-[#030712] text-slate-100 selection:bg-cyan-500 selection:text-white overflow-x-hidden">
+      <AnimatePresence>
+        {isLoading && (
+          <motion.div 
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: 1.1 }}
+            transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed inset-0 z-[10000] flex flex-col items-center justify-center bg-[#030712]"
+          >
+            <div className="relative mb-12 h-24 w-24">
+              <div className="absolute inset-0 animate-[spin_2s_linear_infinite] rounded-full border-b-[3px] border-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.5)]" />
+              <div className="absolute inset-4 animate-[spin_3s_linear_infinite_reverse] rounded-full border-t-[3px] border-blue-500/50" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Shield className="h-8 w-8 text-cyan-400 animate-pulse" />
               </div>
-            ))}
-          </div>
-          <div className="mt-8 h-[1px] w-[260px] bg-slate-800">
-            <div className="h-full bg-gradient-to-r from-violet-500 to-cyan-500 transition-all duration-500" style={{ width: `${(loadStep / 4) * 100}%` }} />
-          </div>
-        </div>
-      )}
-
-      {/* BACKGROUND CANVAS */}
-      <canvas ref={canvasRef} className="fixed inset-0 z-0 pointer-events-none" />
-      <div className="fixed inset-0 z-0 pointer-events-none grid-pattern opacity-10" />
-
-      {/* NAVIGATION */}
-      <nav id="navbar" className="fixed top-0 left-0 right-0 z-[100] border-b border-violet-500/10 bg-[#020617]/50 px-6 py-4 backdrop-blur-xl transition-all duration-300">
-        <div className="mx-auto flex max-w-7xl items-center justify-between">
-          <Link to="/" className="flex items-center gap-3">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500 text-sm font-black text-white shadow-lg shadow-violet-500/20">MG</span>
-            <span className="text-sm font-bold tracking-tight text-white lg:text-base">AI Media Guardian</span>
-          </Link>
-          <div className="hidden items-center gap-8 text-xs font-medium uppercase tracking-widest text-slate-400 md:flex">
-            {["Services", "AI Pipeline", "Results", "History"].map(item => (
-                <Link key={item} to={`/${item.toLowerCase().replace(" ", "-")}`} className="transition hover:text-white">{item}</Link>
-            ))}
-          </div>
-          <Link to="/upload" className="rounded-lg bg-gradient-to-br from-violet-600 to-blue-600 px-5 py-2 text-xs font-bold text-white shadow-lg shadow-violet-500/30 transition hover:-translate-y-0.5">Get Started</Link>
-        </div>
-      </nav>
-
-      {/* CONTENT */}
-      {!isLoading && (
-        <div className="relative z-10 pt-20">
-          <section id="hero" className="flex min-h-[90vh] flex-col items-center justify-center px-6 text-center">
-            <div className="mb-6 flex items-center gap-2 rounded-full border border-violet-500/20 bg-violet-500/5 px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-violet-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-              AI-Powered Protection
             </div>
-            <h1 className="max-w-4xl text-5xl font-extrabold leading-[1.1] tracking-tighter text-white sm:text-7xl">
-              Protect Your Digital <span className="bg-gradient-to-r from-violet-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent italic">Assets</span> with AI
-            </h1>
-            <p className="mt-8 max-w-xl text-balance text-sm leading-relaxed text-slate-400 sm:text-base">
-              Detect unauthorized media usage using advanced AI and explainable analysis.
-              Powered by perceptual hashing, semantic embeddings, and multimodal reasoning.
-            </p>
-            <div className="mt-10 flex flex-wrap justify-center gap-4">
-              <Link to="/scan" className="btn-primary-restored">Start AI Scan</Link>
-              <button className="rounded-xl border border-white/10 bg-white/5 px-8 py-3.5 text-sm font-bold text-white transition hover:bg-white/10">Watch Demo</button>
-            </div>
-            <div className="mt-16 flex gap-12 text-center">
-                {[["99.7%", "Detection Rate"], ["<50ms", "Analysis Time"], ["10M+", "Media Scanned"]].map(([val, lbl]) => (
-                    <div key={lbl}><div className="text-2xl font-black bg-gradient-to-br from-white to-slate-500 bg-clip-text text-transparent">{val}</div><div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mt-1">{lbl}</div></div>
-                ))}
-            </div>
-          </section>
-
-          {/* HOW IT WORKS */}
-          <section id="services" className="mx-auto max-w-7xl px-6 py-24">
-            <div className="text-center">
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-violet-500">How it works</p>
-                <h2 className="mt-4 text-3xl font-bold text-white sm:text-4xl">Triple-Layer Protection</h2>
-                <p className="mx-auto mt-4 max-w-2xl text-slate-400 text-sm">Our AI pipeline analyzes your media through multiple detection layers for comprehensive coverage.</p>
-            </div>
-            <div className="mt-16 grid gap-6 md:grid-cols-3">
-              {[
-                  { step: "01", title: "Upload Media", desc: "Upload your images, videos, or audio. Our system ingests and fingerprints each asset automatically." },
-                  { step: "02", title: "AI Analysis", desc: "Multiple AI models — pHash, embeddings, and Gemini — analyze content for matches and manipulation." },
-                  { step: "03", title: "Explainable Results", desc: "Get detailed results with explainable AI insights. Understand exactly why content was flagged." }
-              ].map((item, i) => (
-                  <div key={item.title} className="step-card group relative rounded-3xl border border-white/5 bg-slate-900/40 p-10 backdrop-blur-md opacity-0 transition-all duration-700 translate-y-10">
-                    <div className="text-[10px] font-bold text-violet-500 uppercase tracking-widest mb-4">Step {item.step}</div>
-                    <h3 className="text-xl font-bold text-white group-hover:text-cyan-400 transition-colors">{item.title}</h3>
-                    <p className="mt-3 text-sm leading-relaxed text-slate-400">{item.desc}</p>
-                  </div>
+            <motion.h2 
+              initial={{ letterSpacing: "0.2em", opacity: 0.5 }}
+              animate={{ letterSpacing: "0.5em", opacity: 1 }}
+              transition={{ repeat: Infinity, duration: 2, repeatType: "reverse" }}
+              className="text-[10px] font-black uppercase text-cyan-500"
+            >
+              Booting Media Guardian
+            </motion.h2>
+            <div className="mt-12 flex gap-2">
+              {[0, 1, 2, 3].map(i => (
+                <motion.div 
+                  key={i} 
+                  initial={{ scaleX: 0 }}
+                  animate={{ scaleX: i < loadStep ? 1 : 0 }}
+                  className={`h-[3px] w-12 origin-left rounded-full transition-colors duration-500 ${i < loadStep ? "bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.8)]" : "bg-slate-800"}`} 
+                />
               ))}
             </div>
-          </section>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-          {/* INSIGHT SECTION */}
-          <section className="mx-auto max-w-3xl px-6 py-20">
-            <div className="insight-panel relative rounded-[2rem] border border-violet-500/20 bg-slate-950/60 p-10 backdrop-blur-2xl opacity-0 translate-y-10 transition-all duration-1000">
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-blue-600">
-                    <span className="text-xs font-black text-white">AI</span>
-                  </div>
-                  <h4 className="text-sm font-bold uppercase tracking-widest">Decision Insight</h4>
-                </div>
-                <span ref={statusRef} className="text-[10px] font-mono uppercase tracking-widest">ready</span>
+      <canvas ref={canvasRef} className="fixed inset-0 z-0 pointer-events-none opacity-80" />
+
+      {/* Hero Section */}
+      <section className="relative flex min-h-screen flex-col items-center justify-center px-6 pt-20">
+        <motion.div 
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.2, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+          className="relative z-10 text-center"
+        >
+          <div className="mb-10 inline-flex items-center gap-3 rounded-full border border-cyan-500/20 bg-cyan-500/5 px-6 py-2 text-[10px] font-black uppercase tracking-[0.3em] text-cyan-400 backdrop-blur-md">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
+            </span>
+            Real-Time Attribution Active
+          </div>
+          <h1 className="max-w-6xl text-6xl font-black leading-[1] tracking-tighter text-white sm:text-9xl">
+            THE APEX OF <br/> 
+            <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-cyan-400 bg-clip-text text-transparent italic">CONTENT TRUST</span>
+          </h1>
+          <p className="mx-auto mt-12 max-w-2xl text-lg font-medium leading-relaxed text-slate-400">
+            Secure your intellectual property with world-class multimodal intelligence. 
+            Automated verification, rights enforcement, and brand integrity at scale.
+          </p>
+          <div className="mt-16 flex flex-wrap justify-center gap-8">
+            <Link to="/upload" className="group relative flex items-center gap-3 overflow-hidden rounded-2xl bg-cyan-600 px-12 py-5 text-[11px] font-black uppercase tracking-[0.2em] text-white shadow-2xl shadow-cyan-600/30 transition-all hover:bg-cyan-500 hover:-translate-y-1">
+              <span className="relative z-10">Initiate Ingestion</span>
+              <Play className="relative z-10 h-4 w-4 fill-white" />
+              <div className="absolute inset-0 z-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+            </Link>
+            <button className="rounded-2xl border border-white/10 bg-white/5 px-12 py-5 text-[11px] font-black uppercase tracking-[0.2em] backdrop-blur-xl transition hover:bg-white/10 hover:-translate-y-1">
+              Architecture Brief
+            </button>
+          </div>
+        </motion.div>
+        
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 2, delay: 1 }}
+          className="absolute bottom-12 flex flex-col items-center gap-4"
+        >
+          <span className="text-[9px] font-bold uppercase tracking-[0.4em] text-slate-500">Decrypting Protocol</span>
+          <div className="h-12 w-[1px] bg-gradient-to-b from-cyan-500/50 to-transparent" />
+        </motion.div>
+      </section>
+
+      {/* Capabilities Section */}
+      <section className="mx-auto max-w-7xl px-6 py-40">
+        <motion.div 
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: "-100px" }}
+          variants={{
+            hidden: { opacity: 0 },
+            show: { opacity: 1, transition: { staggerChildren: 0.2 } }
+          }}
+          className="grid gap-8 md:grid-cols-3"
+        >
+          {[
+            { title: "Structural Analysis", tag: "pHash", icon: Shield, desc: "Perceptual hashing identifies structural mirrors even after color shifts, cropping, or resolution downgrades." },
+            { title: "Semantic Intelligence", tag: "Neural Embeddings", icon: Cpu, desc: "Content-aware vectors detect similar subject matter and context beyond pixel-to-pixel comparison." },
+            { title: "Reasoning Engine", tag: "LMM Gemini", icon: Search, desc: "Our Gemini-powered reasoning engine explains *why* content was flagged with human-like visual understanding." }
+          ].map((item, i) => (
+            <motion.div 
+              key={item.title}
+              variants={{
+                hidden: { opacity: 0, y: 30 },
+                show: { opacity: 1, y: 0 }
+              }}
+              className="group glass-obsidian p-12 rounded-[2.5rem] transition-all duration-500 hover:border-cyan-500/40 hover:glow-cyan"
+            >
+              <div className="mb-8 flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-500 group-hover:scale-110 transition-transform duration-500">
+                <item.icon className="h-7 w-7" />
               </div>
-              <div className="border-l-2 border-violet-500/50 pl-6 text-sm italic leading-relaxed text-slate-400">
-                <span ref={typedRef}/><span className="inline-block h-4 w-[2px] bg-cyan-400 animate-pulse align-middle ml-1" />
+              <div className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.3em] mb-4">{item.tag}</div>
+              <h4 className="text-2xl font-black text-white group-hover:text-cyan-400 transition-colors uppercase tracking-tight">{item.title}</h4>
+              <p className="mt-6 text-base font-medium leading-relaxed text-slate-400">{item.desc}</p>
+            </motion.div>
+          ))}
+        </motion.div>
+      </section>
+
+      {/* Insight Panel Preview */}
+      <section className="mx-auto max-w-5xl px-6 py-20">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true }}
+          onViewportEnter={typeInsight}
+          className="glass-obsidian p-16 rounded-[3rem] shadow-[0_0_100px_rgba(0,0,0,1)] relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 h-64 w-64 bg-cyan-600/5 blur-[100px] pointer-events-none" />
+          <div className="flex items-center justify-between mb-12 pb-8 border-b border-white/5">
+            <div className="flex items-center gap-6">
+              <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-cyan-600 to-blue-600 flex items-center justify-center shadow-xl">
+                <Activity className="h-7 w-7 text-white animate-pulse" />
               </div>
-              <div className="mt-10 grid grid-cols-3 gap-4">
-                {[["pHash Match", "96.1%"], ["Embedding", "0.946"], ["Confidence", "97.3%"]].map(([lbl, val]) => (
-                    <div key={lbl} className="rounded-2xl bg-white/5 p-4 text-center border border-white/10 transition hover:bg-white/10">
-                        <div className="text-xs font-bold text-white mb-1">{val}</div>
-                        <div className="text-[9px] uppercase tracking-widest text-slate-500">{lbl}</div>
-                    </div>
-                ))}
+              <div>
+                <h5 className="text-[11px] font-black uppercase tracking-[0.3em] text-white">System Diagnosis Log-01</h5>
+                <p className="text-[10px] font-bold text-slate-500 uppercase mt-1">Status: Active Analysis</p>
               </div>
             </div>
-          </section>
-
-          {/* FINAL CTA */}
-          <section className="mx-auto max-w-7xl px-6 py-32">
-              <div className="relative overflow-hidden rounded-[3rem] border border-violet-500/30 bg-gradient-to-br from-violet-950/20 to-slate-950/40 p-16 text-center backdrop-blur-xl">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,theme(colors.violet.500/10),transparent_70%)]" />
-                  <h2 className="relative text-3xl font-black text-white sm:text-5xl">Protect Your Brand Today</h2>
-                  <p className="relative mt-6 text-slate-400 max-w-xl mx-auto italic">Join the next generation of digital asset protection powered by multimodal intelligence.</p>
-                  <div className="relative mt-12">
-                      <Link to="/upload" className="btn-primary-restored text-base px-12 py-5">Secure Your First Asset</Link>
-                  </div>
+            <span ref={statusRef} className="text-[10px] font-mono font-black text-slate-500 tracking-[0.3em] border border-white/10 px-4 py-1.5 rounded-full">
+              CALIBRATING...
+            </span>
+          </div>
+          <div className="min-h-[120px] text-2xl font-semibold italic text-slate-200 leading-snug border-l-4 border-cyan-500/40 pl-10">
+            <span ref={typedRef} /><span className="inline-block h-8 w-1 bg-cyan-400 animate-pulse align-middle ml-3" />
+          </div>
+          <div className="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-12">
+            {[["Integrity", "98.4%"], ["Similarity", "0.94x"], ["Compute", "0.2ms"], ["Auth", "Verified"]].map(([l, v]) => (
+              <div key={l} className="group">
+                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 mb-2 group-hover:text-cyan-500/50 transition-colors">{l}</div>
+                <div className="text-xl font-black text-white group-hover:translate-x-1 transition-transform">{v}</div>
               </div>
-          </section>
+            ))}
+          </div>
+        </motion.div>
+      </section>
 
-          <footer className="py-12 text-center border-t border-white/5">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600">&copy; 2026 AI Media Guardian &bull; Advanced AI Layer</p>
-          </footer>
+      {/* CTA Section - Fixed UI */}
+      <section className="mx-auto max-w-7xl px-6 py-40">
+        <motion.div 
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="relative overflow-hidden rounded-[4rem] glass-obsidian p-24 text-center border-white/5 hover:border-cyan-500/20 transition-colors duration-700"
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.1)_0%,transparent_70%)] pointer-events-none" />
+          <div className="relative z-10">
+            <div className="mx-auto mb-10 h-16 w-16 rounded-3xl bg-cyan-500/10 flex items-center justify-center">
+              <Lock className="h-8 w-8 text-cyan-400" />
+            </div>
+            <h2 className="text-4xl font-black text-white sm:text-7xl uppercase tracking-tighter leading-none">
+              SECURE YOUR <br/> <span className="text-cyan-500">DIGITAL FRONTIER</span>
+            </h2>
+            <p className="mt-8 text-xl text-slate-400 max-w-2xl mx-auto font-medium leading-relaxed">
+              Join the elite circle of enterprises ensuring multimodal content integrity across the global workspace.
+            </p>
+            <div className="mt-16 flex flex-wrap justify-center gap-8">
+              <Link to="/upload" className="flex items-center gap-3 rounded-[2rem] bg-white px-14 py-6 text-[12px] font-black uppercase tracking-[0.3em] text-[#030712] transition-all hover:scale-105 hover:shadow-[0_0_40px_rgba(255,255,255,0.4)]">
+                Execute Initial Scan <ChevronRight className="h-4 w-4" />
+              </Link>
+              <button className="rounded-[2rem] border border-white/10 bg-white/5 px-14 py-6 text-[12px] font-black uppercase tracking-[0.3em] backdrop-blur-3xl transition hover:bg-white/10">
+                Contact Protocol
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </section>
+
+      <footer className="py-24 text-center border-t border-white/5 bg-slate-950/40 backdrop-blur-xl">
+        <div className="flex flex-col items-center gap-8">
+          <div className="flex items-center gap-3">
+             <div className="h-6 w-6 rounded bg-cyan-600 flex items-center justify-center font-black text-white text-[8px]">MG</div>
+             <span className="text-xs font-black uppercase tracking-[0.4em]">Media Guardian</span>
+          </div>
+          <p className="text-[10px] font-black uppercase tracking-[0.6em] text-slate-600">
+            Engineered for Content Sovereignty &bull; 2026
+          </p>
         </div>
-      )}
+      </footer>
     </div>
   );
 }
